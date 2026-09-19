@@ -15,11 +15,24 @@ export function validateEnvironment(env: Record<string, unknown>) {
   const url = new URL(origin);
   if (!["http:", "https:"].includes(url.protocol) || url.origin !== origin)
     throw new Error("CORS_ORIGIN must be a single HTTP origin");
+  const storageProvider = String(env.STORAGE_PROVIDER ?? "local").toLowerCase();
+  if (!["local", "s3"].includes(storageProvider)) {
+    throw new Error("STORAGE_PROVIDER must be local or s3");
+  }
+  if (storageProvider === "s3") {
+    for (const name of ["S3_BUCKET", "S3_REGION"]) {
+      if (!String(env[name] ?? "")) throw new Error(`${name} is required for S3 storage`);
+    }
+    if (Boolean(env.S3_ACCESS_KEY) !== Boolean(env.S3_SECRET_KEY)) {
+      throw new Error("S3_ACCESS_KEY and S3_SECRET_KEY must be provided together");
+    }
+  }
   return {
     ...env,
     JWT_SECRET: secret,
     DATABASE_URL: databaseUrl,
     PORT: port,
     CORS_ORIGIN: origin,
+    STORAGE_PROVIDER: storageProvider,
   };
 }

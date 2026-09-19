@@ -4,11 +4,11 @@
 **Branch:** `release/v0.1`  
 **Baseline commit:** `748498c`  
 **Plan:** [`phase-3-plan.md`](./phase-3-plan.md)  
-**Status:** Phase 3.1 database model implemented; Phase 2 entry gates remain open
+**Status:** Phase 3.1 database model and Phase 3.2 storage foundation implemented; Phase 2 entry gates remain open
 
 ## Status summary
 
-Phase 3.1 database implementation has started. This tracker records the verified repository baseline and the work required before medical files, prescription documents, notifications, sharing, or communication can be called complete.
+Phase 3.1 database and Phase 3.2 storage-foundation implementations are complete. This tracker records the verified repository baseline and the work required before medical files, prescription documents, notifications, sharing, or communication can be called complete.
 
 The current repository has a `MedicalRecord` Prisma model with structured notes, diagnosis, advice, follow-up, and medicine JSON. It does not yet have the Phase 3 report, private-storage, share, notification, preference, message, or prescription-PDF implementations.
 
@@ -26,13 +26,13 @@ The current repository has a `MedicalRecord` Prisma model with structured notes,
 ### Not present or not verified
 
 - No report API or report authorization tests yet; the `MedicalReport` model and migration are now present.
-- No S3-compatible storage adapter, private bucket configuration, signed URL service, or malware-scan integration.
+- Storage abstraction now has local and S3-compatible providers, private-key generation, signed URL support, validation, and a development scanner boundary; production malware scanning and provider configuration remain deployment concerns.
 - No prescription PDF generator or prescription-document storage workflow.
 - No report-sharing model, hashed token flow, expiry/revocation API, or consent tests.
 - No notification queue/worker, email provider, push provider, delivery-attempt model, or preference model.
 - No communication/announcement model or message API.
 - No verified Phase 2 API test, frontend typecheck/build, receptionist workflow, audit logging, or browser-test baseline.
-- Backend package dependencies currently do not include an object-storage SDK, PDF library, email provider, push provider, or queue library. Dependency additions require an explicit architecture/configuration review.
+- Backend package dependencies now include the reviewed S3 SDK for Phase 3.2; PDF, email, push, and queue dependencies remain absent. Further dependency additions require an explicit architecture/configuration review.
 
 ## Phase 2 entry-gate status
 
@@ -55,7 +55,7 @@ The current repository has a `MedicalRecord` Prisma model with structured notes,
 |---|---|---|
 | 3.0 Prerequisite/data-contract review | Blocked by Phase 2 gates | Decision record, authorization matrix, API contracts |
 | 3.1 Medical report model | Complete | Prisma migration, validation/generation, backend build/unit tests, and local migration status |
-| 3.2 Secure storage/upload | Not started | Fake-provider tests, validation tests, scan/quarantine behavior |
+| 3.2 Secure storage/upload | Complete | Local/S3 adapter, 10 MB and signature validation, scanner boundary, and storage unit tests |
 | 3.3 Patient report portal | Not started | API tests, frontend typecheck/build, patient ownership tests |
 | 3.4 Doctor/staff access | Not started | Care-relationship authorization tests |
 | 3.5 Prescription PDF | Not started | PDF fixture/content test, private-storage test, download authorization |
@@ -84,10 +84,10 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 
 ## Security and privacy checklist
 
-- [ ] Private storage bucket and no public object ACLs.
-- [ ] Object keys contain no direct patient identifiers.
-- [ ] Upload extension, MIME, signature, size, and authorization validation.
-- [ ] Malware scan/quarantine decision is implemented and tested.
+- [x] Private storage bucket and no public object ACLs are required by the S3 adapter/configuration contract.
+- [x] Generated object keys contain no direct patient identifiers.
+- [x] Upload extension, MIME, signature, and 10 MB size validation is implemented and tested.
+- [ ] Production malware scan/quarantine integration is implemented; the current development scanner is an explicit pass-through boundary.
 - [ ] Signed URLs are short-lived and created only after authorization.
 - [ ] Medical file contents and raw share tokens are excluded from logs.
 - [ ] Patient ownership and doctor care-relationship checks are server-side.
@@ -106,6 +106,14 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 - Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npx prisma validate --schema=../database/schema.prisma` passed; `npx prisma generate --schema=../database/schema.prisma` passed; `npm run build` passed; `npm test` passed with 5 suites and 11 tests; `npx prisma migrate deploy --schema=../database/schema.prisma` applied the pending local migrations; and `npx prisma migrate status --schema=../database/schema.prisma` reports the database schema is up to date.
 - Limitation: no report API, storage adapter, malware scan/quarantine flow, authorization tests, frontend portal, or audit events are included in this database-only slice.
 
+### 2026-09-19 — Phase 3.2 storage foundation
+
+- Changed files: `backend/src/storage/`, `backend/src/app.module.ts`, `backend/src/config/environment.ts`, `backend/.env.example`, `backend/package.json`, `backend/package-lock.json`, and this progress file.
+- Implemented an injectable storage abstraction with local development storage and an AWS S3-compatible provider using private objects, AES-256 server-side encryption, and five-minute signed download URLs.
+- Implemented generated UUID-based keys, PDF/JPEG/PNG extension/MIME/signature checks, empty-file rejection, and a 10 MB maximum. Added a `VirusScanner` boundary with a development pass-through implementation; production scanning remains required before clinical use.
+- Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npm run build` and `npm test` passed after implementation. Storage tests cover upload/key generation, provider delegation, invalid files, size rejection, and scanner rejection.
+- Limitation: no report API, HTTP multipart limit, authorization, audit event, production scanner, retention policy, or deployment-specific bucket policy is included in this slice.
+
 Existing baseline evidence is recorded in:
 
 - `/Users/tohid/Documents/Hospital/SmartCare-HMS/documentation/phase-2-progress.md`
@@ -120,4 +128,4 @@ For each completed Phase 3 area, add the date, branch, objective, changed files,
 2. Complete and record the Phase 2 API, frontend, receptionist, authorization, audit, and deployment prerequisites.
 3. Reconcile the current `MedicalRecord`/prescription source contract before designing PDF fields.
 4. Approve the S3-compatible provider, object-key policy, scan approach, retention, and secret configuration.
-5. Complete Phase 3.1 verification, then implement the storage adapter before adding upload or frontend work.
+5. Resolve the Phase 3.2 production scanner, retention, and deployment configuration decisions before implementing report APIs.
