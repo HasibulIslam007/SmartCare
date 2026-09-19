@@ -51,6 +51,7 @@ model Department {
   description String @db.VarChar(500)
   location String @db.VarChar(100)
   doctors Doctor[]
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
   @@map("departments")
 }
 
@@ -65,6 +66,7 @@ model Doctor {
   experience Int
   consultationFee Int @map("consultation_fee")
   roomNumber String @map("room_number") @db.VarChar(30)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
   schedules Schedule[]
   appointments Appointment[]
   @@map("doctors")
@@ -118,4 +120,16 @@ model MedicalRecord {
   medicines Json
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@map("medical_records")
+}
+
+model HospitalSettings {
+  id String @id @default("main")
+  name String @default("SmartCare Hospital") @db.VarChar(100)
+  address String @default("") @db.VarChar(500)
+  phone String @default("") @db.VarChar(16)
+  email String @default("") @db.VarChar(254)
+  timeZone String @default("Asia/Dhaka") @map("time_zone") @db.VarChar(100)
+  bookingWindowDays Int @default(90) @map("booking_window_days")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("hospital_settings")
 }

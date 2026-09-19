@@ -16,6 +16,7 @@ import {
   PatientProfileDto,
   RecordDto,
   ScheduleDto,
+  DirectoryQuery, AppointmentQuery, PageQuery, UsersQuery, SearchQuery, UpdateDoctorDto,
 } from "./hospital.dto";
 import { Prisma } from "../generated/prisma/client";
 
@@ -29,93 +30,102 @@ export const appointmentInclude = {
   patient: { select: { id: true, name: true } },
   record: true,
 };
-export function hospitalToday() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Dhaka",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+import { SettingsService, hospitalToday } from './settings.service';
+export { hospitalToday } from './settings.service';
+import { pageArgs, pageResult } from './pagination';
+import { PasswordService } from '../auth/password.service';
+import { RegisterDto } from '../auth/auth.dto';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class HospitalService {
-  constructor(private readonly db: PrismaService) {}
-  departments() {
-    return this.db.department.findMany({
-      orderBy: { name: "asc" },
-      include: { _count: { select: { doctors: true } } },
-    });
+  constructor(private readonly db: PrismaService, private readonly settings: SettingsService, private readonly passwords: PasswordService, private readonly userService: UsersService) {}
+  private archiveWhere(state: DirectoryQuery['state']) { return state === 'all' ? {} : { archivedAt: state === 'archived' ? { not: null } : null }; }
+  async departments(query: DirectoryQuery, admin = false) {
+    const where: Prisma.DepartmentWhereInput = { ...this.archiveWhere(admin ? query.state : 'active'), ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}) };
+    const [items, total] = await this.db.$transaction([
+      this.db.department.findMany({ where, orderBy: [{ name: 'asc' }, { id: 'asc' }], include: { _count: { select: { doctors: { where: { archivedAt: null } } } } }, ...pageArgs(query) }),
+      this.db.department.count({ where }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return pageResult(items, total, query);
   }
-  async createDepartment(dto: DepartmentDto) {
+  async doctors(query: DoctorQuery, admin = false) {
+    const where: Prisma.DoctorWhereInput = {
+      ...this.archiveWhere(admin ? query.state : 'active'), departmentId: query.departmentId,
+      ...(!admin ? { user: { role: Role.DOCTOR }, department: { archivedAt: null } } : {}),
+      ...(query.search ? { OR: [{ user: { name: { contains: query.search, mode: 'insensitive' } } }, { specialization: { contains: query.search, mode: 'insensitive' } }, { department: { name: { contains: query.search, mode: 'insensitive' } } }] } : {}),
+    };
+    const [items, total] = await this.db.$transaction([
+      this.db.doctor.findMany({ where, include: doctorInclude, orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.doctor.count({ where }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return pageResult(items, total, query);
+  }
+  private async catalogChange<T>(change: (tx: Prisma.TransactionClient) => Promise<T>) {
     try {
-      return await this.db.department.create({ data: dto });
-    } catch (e) {
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === "P2002"
-      )
-        throw new ConflictException("Department already exists");
-      throw e;
+      return await this.db.$transaction(async tx => {
+        // Serialize catalog changes; booking shares the doctor-row lock below.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(7319002)`;
+        return change(tx);
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') throw new ConflictException('A profile with these details already exists');
+        if (error.code === 'P2025') throw new NotFoundException('Profile not found');
+      }
+      throw error;
     }
   }
-  doctors(query: DoctorQuery) {
-    return this.db.doctor.findMany({
-      where: {
-        departmentId: query.departmentId,
-        user: { role: Role.DOCTOR },
-        ...(query.search
-          ? {
-              OR: [
-                {
-                  user: {
-                    name: { contains: query.search, mode: "insensitive" },
-                  },
-                },
-                {
-                  specialization: {
-                    contains: query.search,
-                    mode: "insensitive",
-                  },
-                },
-              ],
-            }
-          : {}),
-      },
-      include: doctorInclude,
-      orderBy: { user: { name: "asc" } },
-      take: 100,
+  createDepartment(dto: DepartmentDto) { return this.catalogChange(tx => tx.department.create({ data: dto })); }
+  updateDepartment(id: string, dto: DepartmentDto) { return this.catalogChange(tx => tx.department.update({ where: { id }, data: dto })); }
+  archiveDepartment(id: string, archived: boolean) {
+    return this.catalogChange(async tx => {
+      const department = await tx.department.findUnique({ where: { id } });
+      if (!department) throw new NotFoundException('Department not found');
+      if (archived && await tx.doctor.count({ where: { departmentId: id, archivedAt: null } })) throw new ConflictException('Move or archive this department’s active doctors first');
+      return tx.department.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
     });
   }
-  async createDoctor(dto: DoctorDto) {
-    const user = await this.db.user.findUnique({ where: { id: dto.userId } });
-    if (!user || user.role !== Role.DOCTOR)
-      throw new BadRequestException(
-        "Assign the DOCTOR role before creating a doctor profile",
-      );
-    if (
-      !(await this.db.department.findUnique({
-        where: { id: dto.departmentId },
-      }))
-    )
-      throw new NotFoundException("Department not found");
-    try {
-      return await this.db.doctor.create({ data: dto, include: doctorInclude });
-    } catch (e) {
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === "P2002"
-      )
-        throw new ConflictException("Doctor profile already exists");
-      throw e;
-    }
+  createDoctor(dto: DoctorDto) {
+    return this.catalogChange(async tx => {
+      const user = await tx.user.findUnique({ where: { id: dto.userId } });
+      if (!user || user.role !== Role.DOCTOR) throw new BadRequestException('Assign the DOCTOR role before creating a doctor profile');
+      const department = await tx.department.findFirst({ where: { id: dto.departmentId, archivedAt: null } });
+      if (!department) throw new BadRequestException('Choose an active department');
+      return tx.doctor.create({ data: dto, include: doctorInclude });
+    });
   }
-  async doctor(id: string) {
+  updateDoctor(id: string, dto: UpdateDoctorDto) {
+    return this.catalogChange(async tx => {
+      await this.lock(tx, id);
+      const doctor = await tx.doctor.findUnique({ where: { id } });
+      if (!doctor) throw new NotFoundException('Doctor not found');
+      if (!await tx.department.findFirst({ where: { id: dto.departmentId, archivedAt: null } })) throw new BadRequestException('Choose an active department');
+      const { name, ...data } = dto;
+      await tx.user.update({ where: { id: doctor.userId }, data: { name } });
+      return tx.doctor.update({ where: { id }, data, include: doctorInclude });
+    });
+  }
+  archiveDoctor(id: string, archived: boolean) {
+    return this.catalogChange(async tx => {
+      await this.lock(tx, id);
+      const doctor = await tx.doctor.findUnique({ where: { id }, include: { department: true, user: true } });
+      if (!doctor) throw new NotFoundException('Doctor not found');
+      if (archived && await tx.appointment.count({ where: { doctorId: id, status: { in: ['WAITING', 'CALLED'] } } })) throw new ConflictException('Complete or cancel this doctor’s waiting and called visits before archiving');
+      if (!archived && (doctor.department.archivedAt || doctor.user.role !== Role.DOCTOR)) throw new ConflictException('Restore the department and assign the DOCTOR role before restoring this profile');
+      return tx.doctor.update({ where: { id }, data: { archivedAt: archived ? new Date() : null }, include: doctorInclude });
+    });
+  }
+  async registerPatient(dto: RegisterDto) {
+    return this.userService.createPatient({ name: dto.name, email: dto.email, phone: dto.phone, passwordHash: await this.passwords.hash(dto.password) });
+  }
+  async doctor(id: string, publicOnly = false) {
     const doctor = await this.db.doctor.findUnique({
       where: { id },
       include: doctorInclude,
     });
-    if (!doctor) throw new NotFoundException("Doctor not found");
+    if (!doctor || (publicOnly && (doctor.archivedAt || doctor.department.archivedAt))) throw new NotFoundException("Doctor not found");
+    if (publicOnly && !await this.db.user.findFirst({ where: { id: doctor.userId, role: Role.DOCTOR } })) throw new NotFoundException('Doctor not available');
     return doctor;
   }
   async authorizeDoctor(id: string, user: PublicUser) {
@@ -143,7 +153,8 @@ export class HospitalService {
     });
   }
   async availability(id: string, date: string) {
-    const doctor = await this.doctor(id);
+    const settings = await this.settings.get();
+    const doctor = await this.doctor(id, true);
     const schedule = doctor.schedules.find(
       (s) => s.day === new Date(date).getUTCDay(),
     );
@@ -157,7 +168,7 @@ export class HospitalService {
     return {
       date,
       schedule: schedule ?? null,
-      remaining: Math.max(0, (schedule?.maximumPatients ?? 0) - booked),
+      remaining: this.bookableDate(date, settings.timeZone, settings.bookingWindowDays, schedule?.endTime) ? Math.max(0, (schedule?.maximumPatients ?? 0) - booked) : 0,
     };
   }
   private async lock(tx: Prisma.TransactionClient, doctorId: string) {
@@ -176,24 +187,25 @@ export class HospitalService {
     const patient = await this.db.user.findUnique({ where: { id: patientId } });
     if (!patient || patient.role !== Role.PATIENT)
       throw new BadRequestException("A patient account is required");
-    const today = hospitalToday();
-    const days = (Date.parse(dto.date) - Date.parse(today)) / 86400000;
-    if (days < 0 || days > 90)
-      throw new BadRequestException("Choose a date within the next 90 days");
     return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM hospital_settings WHERE id = 'main' FOR SHARE`;
+      const settings = await tx.hospitalSettings.findUniqueOrThrow({ where: { id: 'main' } });
+      const today = hospitalToday(settings.timeZone);
+      const days = (Date.parse(dto.date) - Date.parse(today)) / 86400000;
+      if (days < 0 || days > settings.bookingWindowDays) throw new BadRequestException(`Choose a date within the next ${settings.bookingWindowDays} days`);
       await this.lock(tx, dto.doctorId);
       const doctor = await tx.doctor.findUnique({
         where: { id: dto.doctorId },
-        include: { schedules: true, user: true },
+        include: { schedules: true, user: true, department: true },
       });
-      if (!doctor || doctor.user.role !== Role.DOCTOR)
+      if (!doctor || doctor.archivedAt || doctor.department.archivedAt || doctor.user.role !== Role.DOCTOR)
         throw new NotFoundException("Doctor not available");
       const date = new Date(dto.date);
       const schedule = doctor.schedules.find((s) => s.day === date.getUTCDay());
       if (!schedule)
         throw new ConflictException("Doctor is not available on this day");
       const time = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Dhaka",
+        timeZone: settings.timeZone,
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
@@ -233,22 +245,24 @@ export class HospitalService {
       });
     });
   }
-  appointments(user: PublicUser) {
-    const where =
-      user.role === Role.PATIENT
-        ? { patientId: user.id }
-        : user.role === Role.DOCTOR
-          ? { doctor: { userId: user.id } }
-          : {};
-    return this.db.appointment.findMany({
-      where,
-      include: {
-        ...appointmentInclude,
-        record: user.role === Role.PATIENT || user.role === Role.DOCTOR,
-      },
-      orderBy: [{ date: "desc" }, { serialNumber: "asc" }],
-      take: 200,
-    });
+  private bookableDate(date: string, timeZone: string, window: number, endTime?: string) {
+    const today = hospitalToday(timeZone);
+    const days = (Date.parse(date) - Date.parse(today)) / 86400000;
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+    return !!endTime && days >= 0 && days <= window && (date !== today || time < endTime);
+  }
+  async appointments(user: PublicUser, query: AppointmentQuery) {
+    const access: Prisma.AppointmentWhereInput = user.role === Role.PATIENT ? { patientId: user.id } : user.role === Role.DOCTOR ? { doctor: { userId: user.id } } : {};
+    const where: Prisma.AppointmentWhereInput = { AND: [access, {
+      doctorId: query.doctorId, date: query.date ? new Date(query.date) : undefined,
+      ...(query.view === 'active' ? { status: { in: ['WAITING', 'CALLED'] } } : query.view === 'history' ? { status: { in: ['COMPLETED', 'CANCELLED'] } } : query.view === 'records' ? { record: { isNot: null } } : {}),
+      ...(query.search ? { OR: [{ patient: { name: { contains: query.search, mode: 'insensitive' } } }, { doctor: { user: { name: { contains: query.search, mode: 'insensitive' } } } }] } : {}),
+    }, query.status ? { status: query.status } : {}] };
+    const [items, total] = await this.db.$transaction([
+      this.db.appointment.findMany({ where, include: { ...appointmentInclude, record: user.role === Role.PATIENT || user.role === Role.DOCTOR }, orderBy: [{ date: query.view === 'active' || query.date ? 'asc' : 'desc' }, { serialNumber: 'asc' }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.appointment.count({ where }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return pageResult(items, total, query);
   }
   async cancel(id: string, user: PublicUser) {
     return this.db.$transaction(async (tx) => {
@@ -305,7 +319,7 @@ export class HospitalService {
   }
   async callNext(id: string, date: string, user: PublicUser) {
     await this.authorizeDoctor(id, user);
-    if (date !== hospitalToday())
+    if (date !== hospitalToday((await this.settings.get()).timeZone))
       throw new BadRequestException(
         "Queue changes are only available for today",
       );
@@ -352,8 +366,8 @@ export class HospitalService {
   profile(user: PublicUser) {
     return this.db.patientProfile.findUnique({ where: { userId: user.id } });
   }
-  saveProfile(dto: PatientProfileDto, user: PublicUser) {
-    if (dto.dateOfBirth && dto.dateOfBirth > hospitalToday())
+  async saveProfile(dto: PatientProfileDto, user: PublicUser) {
+    if (dto.dateOfBirth && dto.dateOfBirth > hospitalToday((await this.settings.get()).timeZone))
       throw new BadRequestException("Date of birth cannot be in the future");
     const data = {
       ...dto,
@@ -392,7 +406,7 @@ export class HospitalService {
       update: data,
     });
   }
-  async history(patientId: string, user: PublicUser) {
+  async history(patientId: string, user: PublicUser, query: PageQuery) {
     if (user.role === Role.PATIENT && user.id !== patientId)
       throw new ForbiddenException();
     if (
@@ -408,53 +422,35 @@ export class HospitalService {
       }))
     )
       throw new ForbiddenException("No consultation relationship");
-    return this.db.medicalRecord.findMany({
-      where: { appointment: { patientId } },
-      include: {
-        appointment: { include: { doctor: { include: doctorInclude } } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    const where = { appointment: { patientId } };
+    const [items, total] = await this.db.$transaction([
+      this.db.medicalRecord.findMany({ where, include: { appointment: { include: { doctor: { include: doctorInclude } } } }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.medicalRecord.count({ where }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return pageResult(items, total, query);
   }
-  users(search?: string) {
-    return this.db.user.findMany({
-      where: search
-        ? {
-            OR: [
-              { email: { contains: search, mode: "insensitive" } },
-              { name: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : {},
-      select: publicUserSelect,
-      take: 50,
-      orderBy: { createdAt: "desc" },
-    });
+  async users(query: UsersQuery) {
+    const where: Prisma.UserWhereInput = { role: query.role, ...(query.withoutDoctorProfile ? { doctor: null } : {}), ...(query.search ? { OR: [{ email: { contains: query.search, mode: 'insensitive' } }, { name: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search } }] } : {}) };
+    const [items, total] = await this.db.$transaction([
+      this.db.user.findMany({ where, select: publicUserSelect, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.user.count({ where }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return pageResult(items, total, query);
   }
-  patients(search?: string) {
-    return this.db.user.findMany({
-      where: {
-        role: Role.PATIENT,
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { phone: { contains: search } },
-              ],
-            }
-          : {}),
-      },
-      select: { id: true, name: true, phone: true },
-      take: 50,
-    });
+  async patients(query: SearchQuery) {
+    const where: Prisma.UserWhereInput = { role: Role.PATIENT, ...(query.search ? { OR: [{ name: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search } }, { email: { contains: query.search, mode: 'insensitive' } }] } : {}) };
+    const [items, total] = await this.db.$transaction([
+      this.db.user.findMany({ where, select: { id: true, name: true, phone: true, email: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.user.count({ where }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return pageResult(items, total, query);
   }
   async analytics() {
-    const today = new Date(hospitalToday());
+    const today = new Date(hospitalToday((await this.settings.get()).timeZone));
     const [patients, doctors, departments, appointments] = await Promise.all([
       this.db.user.count({ where: { role: Role.PATIENT } }),
-      this.db.doctor.count(),
-      this.db.department.count(),
+      this.db.doctor.count({ where: { archivedAt: null, department: { archivedAt: null }, user: { role: Role.DOCTOR } } }),
+      this.db.department.count({ where: { archivedAt: null } }),
       this.db.appointment.groupBy({
         by: ["status"],
         where: { date: today },

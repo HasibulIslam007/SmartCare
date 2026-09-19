@@ -13,6 +13,10 @@ import {
   Min,
   ValidateNested,
   IsIn,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  ValidateIf,
 } from "class-validator";
 
 export class DepartmentDto {
@@ -44,7 +48,17 @@ export class BookingDto {
 export class DateQuery {
   @IsDateString({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
 }
-export class DoctorQuery {
+export class PageQuery {
+  @Type(() => Number) @IsInt() @Min(1) @Max(1000000) page: number = 1;
+  @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize: number = 20;
+}
+export class SearchQuery extends PageQuery {
+  @IsOptional() @IsString() @Length(0, 100) search?: string;
+}
+export class DirectoryQuery extends SearchQuery {
+  @IsOptional() @IsIn(['active', 'archived', 'all']) state: 'active' | 'archived' | 'all' = 'active';
+}
+export class DoctorQuery extends DirectoryQuery {
   @IsOptional() @IsString() @Length(0, 100) search?: string;
   @IsOptional() @IsUUID() departmentId?: string;
 }
@@ -83,6 +97,31 @@ export class RecordDto {
   @Type(() => MedicineDto)
   medicines!: MedicineDto[];
 }
-export class UsersQuery {
-  @IsOptional() @IsString() @Length(0, 100) search?: string;
+export class UsersQuery extends SearchQuery {
+  @IsOptional() @IsIn(['PATIENT', 'DOCTOR', 'RECEPTIONIST', 'ADMIN']) role?: 'PATIENT' | 'DOCTOR' | 'RECEPTIONIST' | 'ADMIN';
+  @IsOptional() @IsIn(['true']) withoutDoctorProfile?: 'true';
+}
+export class AppointmentQuery extends SearchQuery {
+  @IsOptional() @IsUUID() doctorId?: string;
+  @IsOptional() @IsDateString({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/) date?: string;
+  @IsOptional() @IsIn(['all', 'active', 'history', 'records']) view: 'all' | 'active' | 'history' | 'records' = 'all';
+  @IsOptional() @IsIn(['WAITING','CALLED','COMPLETED','CANCELLED']) status?: 'WAITING' | 'CALLED' | 'COMPLETED' | 'CANCELLED';
+}
+export class ArchiveDto { @IsBoolean() archived!: boolean; }
+export class UpdateDoctorDto {
+  @IsUUID() departmentId!: string;
+  @IsString() @Length(2, 100) name!: string;
+  @IsString() @Length(2, 200) qualification!: string;
+  @IsString() @Length(2, 100) specialization!: string;
+  @IsInt() @Min(0) @Max(70) experience!: number;
+  @IsInt() @Min(0) @Max(100000) consultationFee!: number;
+  @IsString() @Length(1, 30) roomNumber!: string;
+}
+export class SettingsDto {
+  @IsString() @Length(2,100) name!: string;
+  @IsString() @Length(0,500) address!: string;
+  @IsString() @ValidateIf((_o,v) => v !== '') @Matches(/^\+[1-9]\d{7,14}$/) phone!: string;
+  @IsString() @ValidateIf((_o,v) => v !== '') @IsEmail() @Length(0,254) email!: string;
+  @IsString() @Length(1,100) timeZone!: string;
+  @IsInt() @Min(1) @Max(365) bookingWindowDays!: number;
 }
