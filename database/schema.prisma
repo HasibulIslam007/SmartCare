@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client"
+  output = "../backend/src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  RECEPTIONIST
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(100)
+  phone        String   @unique @db.VarChar(16)
+  email        String   @unique @db.VarChar(254)
+  passwordHash String   @map("password_hash")
+  role         Role     @default(PATIENT)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  doctor Doctor?
+  appointments Appointment[]
+  profile PatientProfile?
+
+  @@map("users")
+}
+
+model PatientProfile {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth DateTime? @db.Date
+  gender String? @db.VarChar(30)
+  bloodGroup String? @db.VarChar(5)
+  address String? @db.VarChar(500)
+  emergencyContact String? @db.VarChar(100)
+  allergies String? @db.VarChar(1000)
+  @@map("patient_profiles")
+}
+
+model Department {
+  id String @id @default(uuid()) @db.Uuid
+  name String @unique @db.VarChar(100)
+  description String @db.VarChar(500)
+  location String @db.VarChar(100)
+  doctors Doctor[]
+  @@map("departments")
+}
+
+model Doctor {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  departmentId String @map("department_id") @db.Uuid
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  qualification String @db.VarChar(200)
+  specialization String @db.VarChar(100)
+  experience Int
+  consultationFee Int @map("consultation_fee")
+  roomNumber String @map("room_number") @db.VarChar(30)
+  schedules Schedule[]
+  appointments Appointment[]
+  @@map("doctors")
+}
+
+model Schedule {
+  id String @id @default(uuid()) @db.Uuid
+  doctorId String @map("doctor_id") @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  day Int
+  startTime String @map("start_time") @db.VarChar(5)
+  endTime String @map("end_time") @db.VarChar(5)
+  maximumPatients Int @map("maximum_patients")
+  @@unique([doctorId, day])
+  @@map("schedules")
+}
+
+enum AppointmentStatus {
+  WAITING
+  CALLED
+  COMPLETED
+  CANCELLED
+}
+
+model Appointment {
+  id String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+  patient User @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctorId String @map("doctor_id") @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  date DateTime @db.Date
+  serialNumber Int @map("serial_number")
+  status AppointmentStatus @default(WAITING)
+  reason String @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  record MedicalRecord?
+  @@unique([doctorId, date, serialNumber])
+  @@index([patientId, date])
+  @@index([doctorId, date, status])
+  @@map("appointments")
+}
+
+model MedicalRecord {
+  id String @id @default(uuid()) @db.Uuid
+  appointmentId String @unique @map("appointment_id") @db.Uuid
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  notes String @db.VarChar(5000)
+  diagnosis String @db.VarChar(1000)
+  advice String @db.VarChar(2000)
+  followUp DateTime? @db.Date
+  medicines Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@map("medical_records")
+}
