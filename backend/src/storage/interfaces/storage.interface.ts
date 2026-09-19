@@ -18,3 +18,17 @@ export interface StorageFile {
   filename: string;
   mimeType: string;
 }
+
+export interface StorageValidationConfig {
+  maxUploadSize: number;
+  allowedFileTypes: readonly string[];
+}
+
+export interface StorageAuditMetadata {
+  fileKey: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+  fileSize: number;
+  mimeType: string;
+  storageProvider: string;
+}

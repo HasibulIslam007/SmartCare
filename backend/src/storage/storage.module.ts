@@ -5,11 +5,20 @@ import { LocalStorageProvider } from "./providers/local.provider";
 import { S3StorageProvider } from "./providers/s3.provider";
 import { DevelopmentVirusScanner } from "./scanner.service";
 import { StorageService } from "./storage.service";
-import { STORAGE_PROVIDER, VIRUS_SCANNER } from "./interfaces/storage.tokens";
+import { StorageValidationConfig } from "./interfaces/storage.interface";
+import { STORAGE_PROVIDER, STORAGE_VALIDATION_CONFIG, VIRUS_SCANNER } from "./interfaces/storage.tokens";
 
 @Module({
   providers: [
     StorageService,
+    {
+      provide: STORAGE_VALIDATION_CONFIG,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): StorageValidationConfig => ({
+        maxUploadSize: config.getOrThrow<number>("MAX_UPLOAD_SIZE"),
+        allowedFileTypes: config.getOrThrow<string[]>("ALLOWED_FILE_TYPES"),
+      }),
+    },
     DevelopmentVirusScanner,
     { provide: VIRUS_SCANNER, useExisting: DevelopmentVirusScanner },
     {

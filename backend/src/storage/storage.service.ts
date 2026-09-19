@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { StorageProvider, StorageFile, VirusScanner } from "./interfaces/storage.interface";
-import { STORAGE_PROVIDER, VIRUS_SCANNER } from "./interfaces/storage.tokens";
+import { StorageProvider, StorageFile, StorageValidationConfig, VirusScanner } from "./interfaces/storage.interface";
+import { STORAGE_PROVIDER, STORAGE_VALIDATION_CONFIG, VIRUS_SCANNER } from "./interfaces/storage.tokens";
 import { StorageScanError } from "./storage.errors";
 import { validateStorageFile } from "./storage.validation";
 
@@ -9,10 +9,14 @@ export class StorageService {
   constructor(
     @Inject(STORAGE_PROVIDER) private readonly provider: StorageProvider,
     @Inject(VIRUS_SCANNER) private readonly scanner: VirusScanner,
+    @Inject(STORAGE_VALIDATION_CONFIG) private readonly validationConfig: StorageValidationConfig = {
+      maxUploadSize: 10 * 1024 * 1024,
+      allowedFileTypes: ["application/pdf", "image/jpeg", "image/png"],
+    },
   ) {}
 
   async uploadFile(input: StorageFile): Promise<string> {
-    const key = validateStorageFile(input);
+    const key = validateStorageFile(input, this.validationConfig);
     const scan = await this.scanner.scan(input.file);
     if (!scan.clean) throw new StorageScanError(scan.reason ?? "File failed malware scanning");
     try {

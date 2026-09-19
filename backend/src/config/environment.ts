@@ -27,6 +27,18 @@ export function validateEnvironment(env: Record<string, unknown>) {
       throw new Error("S3_ACCESS_KEY and S3_SECRET_KEY must be provided together");
     }
   }
+  const maxUploadSize = Number(env.MAX_UPLOAD_SIZE ?? 10 * 1024 * 1024);
+  if (!Number.isSafeInteger(maxUploadSize) || maxUploadSize < 1 || maxUploadSize > 10 * 1024 * 1024) {
+    throw new Error("MAX_UPLOAD_SIZE must be a positive integer no greater than 10 MB");
+  }
+  const allowedFileTypes = String(env.ALLOWED_FILE_TYPES ?? "application/pdf,image/jpeg,image/png")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const supportedFileTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
+  if (!allowedFileTypes.length || allowedFileTypes.some((value) => !supportedFileTypes.has(value))) {
+    throw new Error("ALLOWED_FILE_TYPES may contain only application/pdf, image/jpeg, and image/png");
+  }
   return {
     ...env,
     JWT_SECRET: secret,
@@ -34,5 +46,7 @@ export function validateEnvironment(env: Record<string, unknown>) {
     PORT: port,
     CORS_ORIGIN: origin,
     STORAGE_PROVIDER: storageProvider,
+    MAX_UPLOAD_SIZE: maxUploadSize,
+    ALLOWED_FILE_TYPES: allowedFileTypes,
   };
 }

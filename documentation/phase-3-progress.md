@@ -26,7 +26,7 @@ The current repository has a `MedicalRecord` Prisma model with structured notes,
 ### Not present or not verified
 
 - No report API or report authorization tests yet; the `MedicalReport` model and migration are now present.
-- Storage abstraction now has local and S3-compatible providers, private-key generation, signed URL support, validation, and a development scanner boundary; production malware scanning and provider configuration remain deployment concerns.
+- Storage abstraction now has local and S3-compatible providers, private-key generation, signed URL support, configurable validation, and a development scanner boundary; production malware scanning and provider configuration remain deployment concerns.
 - No prescription PDF generator or prescription-document storage workflow.
 - No report-sharing model, hashed token flow, expiry/revocation API, or consent tests.
 - No notification queue/worker, email provider, push provider, delivery-attempt model, or preference model.
@@ -47,7 +47,7 @@ The current repository has a `MedicalRecord` Prisma model with structured notes,
 | Authorization review | Incomplete | Complete ownership and role review, especially medical-history access |
 | Audit logging | Not implemented | Phase 2 work must establish the event/audit foundation used by Phase 3 |
 | Consultation/prescription source contract | Reconciliation required | Current source tree/schema and Phase 2 plan use different module terminology; resolve before PDF work |
-| Storage provider decision | Planned | Use an S3-compatible private adapter; provider and credentials remain undecided |
+| Storage provider decision | Defined | S3-compatible private adapter with local development provider; provider credentials and deployment endpoint remain environment-specific |
 
 ## Phase 3 work tracker
 
@@ -87,7 +87,9 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 - [x] Private storage bucket and no public object ACLs are required by the S3 adapter/configuration contract.
 - [x] Generated object keys contain no direct patient identifiers.
 - [x] Upload extension, MIME, signature, and 10 MB size validation is implemented and tested.
+- [x] `MAX_UPLOAD_SIZE` and `ALLOWED_FILE_TYPES` are validated at application startup and injected into storage validation.
 - [ ] Production malware scan/quarantine integration is implemented; the current development scanner is an explicit pass-through boundary.
+- [ ] Report-service ownership checks are implemented; raw storage operations intentionally accept only opaque keys and are not API endpoints.
 - [ ] Signed URLs are short-lived and created only after authorization.
 - [ ] Medical file contents and raw share tokens are excluded from logs.
 - [ ] Patient ownership and doctor care-relationship checks are server-side.
@@ -111,8 +113,10 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 - Changed files: `backend/src/storage/`, `backend/src/app.module.ts`, `backend/src/config/environment.ts`, `backend/.env.example`, `backend/package.json`, `backend/package-lock.json`, and this progress file.
 - Implemented an injectable storage abstraction with local development storage and an AWS S3-compatible provider using private objects, AES-256 server-side encryption, and five-minute signed download URLs.
 - Implemented generated UUID-based keys, PDF/JPEG/PNG extension/MIME/signature checks, empty-file rejection, and a 10 MB maximum. Added a `VirusScanner` boundary with a development pass-through implementation; production scanning remains required before clinical use.
+- Added startup validation and dependency injection for `MAX_UPLOAD_SIZE` and `ALLOWED_FILE_TYPES`. Added `StorageAuditMetadata` for the future report/audit service (`fileKey`, uploader, upload time, size, MIME type, and provider).
+- Storage never returns raw bucket paths: S3 access is temporary signed URL generation, while local access uses a non-HTTP development scheme. Ownership checks remain in Phase 3.3 because storage has no report or authenticated-user context.
 - Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npm run build` and `npm test` passed after implementation. Storage tests cover upload/key generation, provider delegation, invalid files, size rejection, and scanner rejection.
-- Limitation: no report API, HTTP multipart limit, authorization, audit event, production scanner, retention policy, or deployment-specific bucket policy is included in this slice.
+- Limitation: no report API, HTTP multipart limit, ownership authorization, audit event persistence, production scanner, retention policy, or deployment-specific bucket policy is included in this slice.
 
 Existing baseline evidence is recorded in:
 

@@ -16,4 +16,26 @@ describe("environment", () => {
   ])("rejects invalid configuration %j", (override) => {
     expect(() => validateEnvironment({ ...env, ...override })).toThrow();
   });
+
+  it("normalizes and returns storage validation configuration", () => {
+    expect(
+      validateEnvironment({
+        ...env,
+        MAX_UPLOAD_SIZE: "1048576",
+        ALLOWED_FILE_TYPES: "application/pdf, image/png",
+      }),
+    ).toMatchObject({
+      MAX_UPLOAD_SIZE: 1048576,
+      ALLOWED_FILE_TYPES: ["application/pdf", "image/png"],
+    });
+  });
+
+  it.each([
+    { MAX_UPLOAD_SIZE: "0" },
+    { MAX_UPLOAD_SIZE: "10485761" },
+    { ALLOWED_FILE_TYPES: "application/x-executable" },
+    { ALLOWED_FILE_TYPES: "" },
+  ])("rejects unsafe storage configuration %j", (override) => {
+    expect(() => validateEnvironment({ ...env, ...override })).toThrow();
+  });
 });
