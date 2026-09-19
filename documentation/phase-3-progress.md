@@ -4,7 +4,7 @@
 **Branch:** `release/v0.1`  
 **Baseline commit:** `748498c`  
 **Plan:** [`phase-3-plan.md`](./phase-3-plan.md)  
-**Status:** Phase 3.1 database model and Phase 3.2 storage foundation implemented; Phase 2 entry gates remain open
+**Status:** Phase 3.1 database model, Phase 3.2 storage foundation, and Phase 3.3 report API foundation implemented; Phase 2 entry gates remain open
 
 ## Status summary
 
@@ -117,6 +117,16 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 - Storage never returns raw bucket paths: S3 access is temporary signed URL generation, while local access uses a non-HTTP development scheme. Ownership checks remain in Phase 3.3 because storage has no report or authenticated-user context.
 - Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npm run build` and `npm test` passed after implementation. Storage tests cover upload/key generation, provider delegation, invalid files, size rejection, and scanner rejection.
 - Limitation: no report API, HTTP multipart limit, ownership authorization, audit event persistence, production scanner, retention policy, or deployment-specific bucket policy is included in this slice.
+
+### 2026-09-19 — Phase 3.3 medical report API foundation
+
+- Changed files: `backend/src/reports/`, `backend/src/app.module.ts`, and this progress file.
+- Implemented authenticated `POST /api/v1/reports` multipart upload, `GET /api/v1/reports` listing with type/status/pagination filters, and `GET /api/v1/reports/:id/download` temporary URL access.
+- Uploads enforce the existing 10 MB multipart limit and the storage validation/scanner boundary. Filenames are reduced to a basename; generated storage keys remain provider-owned. Database rows contain metadata only and report responses never include `fileKey`.
+- Authorization: patients can access only their own reports; doctors can access patients connected through `CALLED` or `COMPLETED` appointments; administrators have system access; receptionists are denied. Doctor access intentionally uses the existing appointment relationship because no separate consultation model exists.
+- Added `REPORT_UPLOADED`, `REPORT_VIEWED`, and `REPORT_DOWNLOADED` event contracts with an injectable no-op sink. Persistence is intentionally deferred until the audit schema is approved.
+- Verification: `npm run typecheck`, `npm run build`, and report service unit tests pass. Full API tests still require `TEST_DATABASE_URL` and should be run against an isolated database.
+- Limitations: production malware quarantine, retention/deletion policy, persisted audit events, and a doctor-specific consultation/assignment model remain outside this slice. Upload is restricted to administrators and doctors with an existing completed/in-progress appointment relationship; patient self-upload is not enabled.
 
 Existing baseline evidence is recorded in:
 
