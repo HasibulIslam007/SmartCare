@@ -28,7 +28,7 @@ export const doctorInclude = {
 export const appointmentInclude = {
   doctor: { include: doctorInclude },
   patient: { select: { id: true, name: true } },
-  record: true,
+  record: { include: { prescriptionFile: { select: { id: true, fileName: true, fileSize: true, createdAt: true } } } },
 };
 import { SettingsService, hospitalToday } from './settings.service';
 export { hospitalToday } from './settings.service';
@@ -36,10 +36,11 @@ import { pageArgs, pageResult } from './pagination';
 import { PasswordService } from '../auth/password.service';
 import { RegisterDto } from '../auth/auth.dto';
 import { UsersService } from '../users/users.service';
+import { PrescriptionService } from './prescription.service';
 
 @Injectable()
 export class HospitalService {
-  constructor(private readonly db: PrismaService, private readonly settings: SettingsService, private readonly passwords: PasswordService, private readonly userService: UsersService) {}
+  constructor(private readonly db: PrismaService, private readonly settings: SettingsService, private readonly passwords: PasswordService, private readonly userService: UsersService, private readonly prescriptions: PrescriptionService) {}
   private archiveWhere(state: DirectoryQuery['state']) { return state === 'all' ? {} : { archivedAt: state === 'archived' ? { not: null } : null }; }
   async departments(query: DirectoryQuery, admin = false) {
     const where: Prisma.DepartmentWhereInput = { ...this.archiveWhere(admin ? query.state : 'active'), ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}) };
@@ -259,7 +260,7 @@ export class HospitalService {
       ...(query.search ? { OR: [{ patient: { name: { contains: query.search, mode: 'insensitive' } } }, { doctor: { user: { name: { contains: query.search, mode: 'insensitive' } } } }] } : {}),
     }, query.status ? { status: query.status } : {}] };
     const [items, total] = await this.db.$transaction([
-      this.db.appointment.findMany({ where, include: { ...appointmentInclude, record: user.role === Role.PATIENT || user.role === Role.DOCTOR }, orderBy: [{ date: query.view === 'active' || query.date ? 'asc' : 'desc' }, { serialNumber: 'asc' }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.appointment.findMany({ where, include: { ...appointmentInclude, record: user.role === Role.PATIENT || user.role === Role.DOCTOR ? { include: { prescriptionFile: { select: { id: true, fileName: true, fileSize: true, createdAt: true } } } } : false }, orderBy: [{ date: query.view === 'active' || query.date ? 'asc' : 'desc' }, { serialNumber: 'asc' }, { id: 'asc' }], ...pageArgs(query) }),
       this.db.appointment.count({ where }),
     ], { isolationLevel: 'RepeatableRead' });
     return pageResult(items, total, query);
@@ -400,11 +401,13 @@ export class HospitalService {
       medicines: dto.medicines.map((m) => ({ ...m })),
       followUp: dto.followUp ? new Date(dto.followUp) : null,
     };
-    return this.db.medicalRecord.upsert({
+    const record = await this.db.medicalRecord.upsert({
       where: { appointmentId: id },
       create: { ...data, appointmentId: id },
       update: data,
     });
+    await this.prescriptions.generate(record.id);
+    return record;
   }
   async history(patientId: string, user: PublicUser, query: PageQuery) {
     if (user.role === Role.PATIENT && user.id !== patientId)
@@ -424,7 +427,7 @@ export class HospitalService {
       throw new ForbiddenException("No consultation relationship");
     const where = { appointment: { patientId } };
     const [items, total] = await this.db.$transaction([
-      this.db.medicalRecord.findMany({ where, include: { appointment: { include: { doctor: { include: doctorInclude } } } }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(query) }),
+      this.db.medicalRecord.findMany({ where, include: { prescriptionFile: { select: { id: true, fileName: true, fileSize: true, createdAt: true } }, appointment: { include: { doctor: { include: doctorInclude } } } }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(query) }),
       this.db.medicalRecord.count({ where }),
     ], { isolationLevel: 'RepeatableRead' });
     return pageResult(items, total, query);

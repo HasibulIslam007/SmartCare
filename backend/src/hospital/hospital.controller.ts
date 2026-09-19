@@ -27,9 +27,10 @@ import {
 
 import { SettingsService } from './settings.service';
 import { RegisterDto } from '../auth/auth.dto';
+import { PrescriptionService } from './prescription.service';
 @Controller()
 export class HospitalController {
-  constructor(private readonly hospital: HospitalService, private readonly settings: SettingsService) {}
+  constructor(private readonly hospital: HospitalService, private readonly settings: SettingsService, private readonly prescriptions: PrescriptionService) {}
   @Public() @Get("departments") departments(@Query() q: DirectoryQuery) {
     return this.hospital.departments(q);
   }
@@ -117,6 +118,12 @@ export class HospitalController {
     @CurrentUser() user: PublicUser,
   ) {
     return this.hospital.record(id, dto, user);
+  }
+  @Roles(Role.ADMIN, Role.DOCTOR, Role.PATIENT) @Get("prescriptions/:id/download") prescriptionDownload(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentUser() user: PublicUser,
+  ) {
+    return this.prescriptions.download(user, id);
   }
   @Roles(Role.DOCTOR, Role.PATIENT) @Get("patients/:id/history") history(
     @Param("id", ParseUUIDPipe) id: string,

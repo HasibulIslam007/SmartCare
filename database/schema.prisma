@@ -121,7 +121,22 @@ model MedicalRecord {
   followUp DateTime? @db.Date
   medicines Json
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+  prescriptionFile PrescriptionFile?
   @@map("medical_records")
+}
+
+model PrescriptionFile {
+  id             String       @id @default(uuid()) @db.Uuid
+  medicalRecordId String      @unique @map("medical_record_id") @db.Uuid
+  medicalRecord  MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Restrict)
+  fileKey        String       @map("file_key") @db.VarChar(500)
+  fileName       String       @map("file_name") @db.VarChar(255)
+  mimeType       String       @map("mime_type") @db.VarChar(100)
+  fileSize       Int          @map("file_size")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("prescription_files")
 }
 
 enum ReportType {

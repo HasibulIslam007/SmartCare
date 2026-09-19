@@ -4,7 +4,7 @@
 **Branch:** `release/v0.1`  
 **Baseline commit:** `748498c`  
 **Plan:** [`phase-3-plan.md`](./phase-3-plan.md)  
-**Status:** Phase 3.1 database model, Phase 3.2 storage foundation, Phase 3.3 report API foundation, and Phase 3.4 frontend report portal implemented; Phase 2 entry gates remain open
+**Status:** Phase 3.1 database model, Phase 3.2 storage foundation, Phase 3.3 report API foundation, Phase 3.4 frontend report portal, and Phase 3.5 prescription PDF access implemented; Phase 2 entry gates remain open
 
 ## Status summary
 
@@ -146,6 +146,15 @@ Existing baseline evidence is recorded in:
 For each completed Phase 3 area, add the date, branch, objective, changed files, exact commands, pass/fail output, limitations, and remaining blockers here. Do not mark a feature complete from code inspection alone.
 
 ## Current blockers and next actions
+
+### 2026-09-19 — Phase 3.5 secure prescription PDFs
+
+- Added the additive `prescription_files` metadata table and one-to-one `MedicalRecord` relation. The foreign key uses `RESTRICT`, not cascade, so healthcare records cannot be removed accidentally through file cleanup.
+- Added an in-process standards-compliant PDF generator. It uses `HospitalSettings` branding and the structured medical record; PDF bytes remain outside PostgreSQL and are uploaded through `StorageService`.
+- Doctor record writes generate or replace the private prescription object with storage rollback on metadata persistence failure. API responses expose metadata only.
+- Added `GET /api/v1/prescriptions/:id/download` for patients, treating doctors, and administrators. It performs ownership/consultation authorization and returns a five-minute signed URL only.
+- Added the patient records-page PDF download action and same-origin proxy allowlist entry. Browser-test infrastructure remains unavailable.
+- Verification: backend typecheck and existing unit tests pass; focused prescription tests added; frontend typecheck/build and migration deployment must be recorded after the final validation run.
 
 1. Commit the Phase 2 plan/progress files that are currently untracked.
 2. Complete and record the Phase 2 API, frontend, receptionist, authorization, audit, and deployment prerequisites.

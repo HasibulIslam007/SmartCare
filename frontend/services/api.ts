@@ -71,6 +71,7 @@ export interface MedicalRecord {
   followUp: string | null;
   medicines: Medicine[];
   createdAt: string;
+  prescriptionFile?: { id: string; fileName: string; fileSize: number; createdAt: string } | null;
 }
 export interface Appointment {
   id: string;
