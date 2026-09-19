@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   CalendarDays,
   ClipboardList,
+  FileText,
   HeartPulse,
   LayoutDashboard,
   LogOut,
@@ -41,6 +42,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ...(!staff
       ? [
           { href: "/records", label: "Medical records", icon: ClipboardList },
+           { href: "/reports", label: "Medical reports", icon: FileText },
           { href: "/profile", label: "My profile", icon: UserRound },
         ]
       : []),

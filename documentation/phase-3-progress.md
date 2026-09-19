@@ -4,7 +4,7 @@
 **Branch:** `release/v0.1`  
 **Baseline commit:** `748498c`  
 **Plan:** [`phase-3-plan.md`](./phase-3-plan.md)  
-**Status:** Phase 3.1 database model, Phase 3.2 storage foundation, and Phase 3.3 report API foundation implemented; Phase 2 entry gates remain open
+**Status:** Phase 3.1 database model, Phase 3.2 storage foundation, Phase 3.3 report API foundation, and Phase 3.4 frontend report portal implemented; Phase 2 entry gates remain open
 
 ## Status summary
 
@@ -127,6 +127,15 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 - Added `REPORT_UPLOADED`, `REPORT_VIEWED`, and `REPORT_DOWNLOADED` event contracts with an injectable no-op sink. Persistence is intentionally deferred until the audit schema is approved.
 - Verification: `npm run typecheck`, `npm run build`, and report service unit tests pass. Full API tests still require `TEST_DATABASE_URL` and should be run against an isolated database.
 - Limitations: production malware quarantine, retention/deletion policy, persisted audit events, and a doctor-specific consultation/assignment model remain outside this slice. Upload is restricted to administrators and doctors with an existing completed/in-progress appointment relationship; patient self-upload is not enabled.
+
+### 2026-09-19 — Phase 3.4 patient and doctor report views
+
+- Changed files: `frontend/app/api/[...path]/route.ts`, `frontend/app/reports/page.tsx`, `frontend/app/workspace/page.tsx`, `frontend/components/report-list.tsx`, `frontend/components/shell.tsx`, `frontend/services/api.ts`, `frontend/app/globals.css`, and this progress file.
+- Added the authenticated patient `/reports` page with report metadata, report-type labels, loading, empty, and error states. The patient navigation exposes the page without changing the existing records workflow.
+- Added the doctor workspace report section for the selected patient appointment. The existing backend authorization remains authoritative; the UI only displays reports returned for the selected authorized patient.
+- Downloads call `GET /api/v1/reports/:id/download` through the same-origin Next.js proxy and open only the returned short-lived signed URL. No storage key or bucket URL is generated or exposed by the frontend.
+- Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/frontend && npm run typecheck && npm run build` passed; `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npm test -- --runInBand` passed with 8 suites and 29 tests; `git diff --check` passed.
+- Limitation: this repository has no configured browser-test runner or browser test suite. Full API/e2e tests still require an isolated `TEST_DATABASE_URL`; no new backend authorization behavior was introduced in this slice.
 
 Existing baseline evidence is recorded in:
 
