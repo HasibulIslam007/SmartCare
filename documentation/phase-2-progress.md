@@ -37,6 +37,20 @@ Phase 2 is in progress. The initial backend build blocker has been fixed and ver
   Tests:       11 passed, 11 total
   ```
 
+- Re-verified on 2026-09-19 from the local `release/v0.1` checkout:
+
+  ```text
+  cd backend && npm run build
+  exit code 0
+
+  cd backend && npm test
+  Test Suites: 5 passed, 5 total
+  Tests:       11 passed, 11 total
+  exit code 0
+  ```
+
+- The requested DTO change remains present: `DoctorQuery` inherits `search` from `SearchQuery` and declares only `departmentId`.
+
 - Local fix commit:
 
   ```text
@@ -63,8 +77,8 @@ Phase 2 is in progress. The initial backend build blocker has been fixed and ver
 
 | Area | Status | Evidence / command |
 |---|---|---|
-| Backend TypeScript build | Complete | `cd backend && npm run build` passed |
-| Backend unit tests | Complete | `cd backend && npm test`; 5 suites, 11 tests passed |
+| Backend TypeScript build | Complete | `cd backend && npm run build` passed on 2026-09-19 |
+| Backend unit tests | Complete | `cd backend && npm test`; 5 suites, 11 tests passed on 2026-09-19 |
 | Backend API tests | Not yet verified for Phase 2 | Run `cd backend && npm run test:api` |
 | Frontend typecheck | Not yet run for Phase 2 | Run `cd frontend && npm run typecheck` |
 | Frontend production build | Not yet run for Phase 2 | Run `cd frontend && npm run build` |
@@ -81,7 +95,7 @@ Phase 2 is in progress. The initial backend build blocker has been fixed and ver
 
 ## Remaining Blockers
 
-1. The latest backend fix must be confirmed on `origin/release/v0.1` after the previously hanging push process.
+1. Documentation commit `e6643a9` is still not confirmed on `origin/release/v0.1`; `git push origin release/v0.1` did not complete within the available command timeout. Local `HEAD` is `e6643a9`; remote remains `748498c`.
 2. Receptionist registration and complete walk-in front-desk workflow need implementation or completion.
 3. Backend authorization, validation, and error-handling review is incomplete.
 4. Refresh-token session management and revocation are not implemented.
@@ -93,7 +107,7 @@ Phase 2 is in progress. The initial backend build blocker has been fixed and ver
 
 ## Next Actions
 
-1. Confirm the release branch remote contains commit `748498c`.
+1. Push and confirm documentation commit `e6643a9` on `origin/release/v0.1`.
 2. Run backend API tests and record results.
 3. Audit backend modules in the order defined by the Phase 2 plan.
 4. Trace the current receptionist UI/API flow before making workflow changes.
