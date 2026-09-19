@@ -28,6 +28,8 @@ model User {
   doctor Doctor?
   appointments Appointment[]
   profile PatientProfile?
+  medicalReportsAsPatient MedicalReport[] @relation("MedicalReportPatient")
+  medicalReportsUploaded MedicalReport[] @relation("MedicalReportUploader")
 
   @@map("users")
 }
@@ -120,6 +122,44 @@ model MedicalRecord {
   medicines Json
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@map("medical_records")
+}
+
+enum ReportType {
+  BLOOD_TEST
+  XRAY
+  MRI
+  CT_SCAN
+  ULTRASOUND
+  PRESCRIPTION
+  DISCHARGE_SUMMARY
+  OTHER
+}
+
+enum ReportStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model MedicalReport {
+  id           String       @id @default(uuid()) @db.Uuid
+  patientId    String       @map("patient_id") @db.Uuid
+  uploadedById String       @map("uploaded_by_id") @db.Uuid
+  patient      User         @relation("MedicalReportPatient", fields: [patientId], references: [id], onDelete: Restrict)
+  uploadedBy   User         @relation("MedicalReportUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  title        String       @db.VarChar(200)
+  reportType   ReportType   @map("report_type")
+  fileKey      String       @map("file_key") @db.VarChar(500)
+  fileName     String       @map("file_name") @db.VarChar(255)
+  mimeType     String       @map("mime_type") @db.VarChar(100)
+  fileSize     Int          @map("file_size")
+  description  String?      @db.VarChar(2000)
+  status       ReportStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([patientId, status, createdAt])
+  @@index([uploadedById, createdAt])
+  @@map("medical_reports")
 }
 
 model HospitalSettings {
