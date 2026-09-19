@@ -59,7 +59,6 @@ export class DirectoryQuery extends SearchQuery {
   @IsOptional() @IsIn(['active', 'archived', 'all']) state: 'active' | 'archived' | 'all' = 'active';
 }
 export class DoctorQuery extends DirectoryQuery {
-  @IsOptional() @IsString() @Length(0, 100) search?: string;
   @IsOptional() @IsUUID() departmentId?: string;
 }
 export class PatientProfileDto {
