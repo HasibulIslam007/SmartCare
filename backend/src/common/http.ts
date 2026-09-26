@@ -6,6 +6,7 @@ import {
   HttpException,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from "@nestjs/common";
 import { Response } from "express";
 import { map } from "rxjs/operators";
@@ -16,7 +17,7 @@ export class ResponseInterceptor implements NestInterceptor {
     return next
       .handle()
       .pipe(
-        map((data: unknown) => ({
+        map((data: unknown) => data instanceof StreamableFile ? data : ({
           success: true,
           message: "Request successful",
           data,

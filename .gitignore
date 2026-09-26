@@ -119,5 +119,8 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# ---------- Project documentation (local only, not committed) ----------
+documentation/
+
 # Keep the frontend environment template versioned.
 !frontend/.env.example

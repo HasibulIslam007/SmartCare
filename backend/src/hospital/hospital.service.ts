@@ -37,10 +37,12 @@ import { PasswordService } from '../auth/password.service';
 import { RegisterDto } from '../auth/auth.dto';
 import { UsersService } from '../users/users.service';
 import { PrescriptionService } from './prescription.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../generated/prisma/enums';
 
 @Injectable()
 export class HospitalService {
-  constructor(private readonly db: PrismaService, private readonly settings: SettingsService, private readonly passwords: PasswordService, private readonly userService: UsersService, private readonly prescriptions: PrescriptionService) {}
+  constructor(private readonly db: PrismaService, private readonly settings: SettingsService, private readonly passwords: PasswordService, private readonly userService: UsersService, private readonly prescriptions: PrescriptionService, private readonly notifications: NotificationsService) {}
   private archiveWhere(state: DirectoryQuery['state']) { return state === 'all' ? {} : { archivedAt: state === 'archived' ? { not: null } : null }; }
   async departments(query: DirectoryQuery, admin = false) {
     const where: Prisma.DepartmentWhereInput = { ...this.archiveWhere(admin ? query.state : 'active'), ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}) };
@@ -144,7 +146,7 @@ export class HospitalService {
     await this.authorizeDoctor(id, user);
     if (dto.startTime >= dto.endTime)
       throw new BadRequestException("End time must be after start time");
-    return this.db.$transaction(async (tx) => {
+    const schedule = await this.db.$transaction(async (tx) => {
       await this.lock(tx, id);
       return tx.schedule.upsert({
         where: { doctorId_day: { doctorId: id, day: dto.day } },
@@ -152,6 +154,7 @@ export class HospitalService {
         update: dto,
       });
     });
+    return schedule;
   }
   async availability(id: string, date: string) {
     const settings = await this.settings.get();
@@ -188,7 +191,7 @@ export class HospitalService {
     const patient = await this.db.user.findUnique({ where: { id: patientId } });
     if (!patient || patient.role !== Role.PATIENT)
       throw new BadRequestException("A patient account is required");
-    return this.db.$transaction(async (tx) => {
+    const appointment = await this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM hospital_settings WHERE id = 'main' FOR SHARE`;
       const settings = await tx.hospitalSettings.findUniqueOrThrow({ where: { id: 'main' } });
       const today = hospitalToday(settings.timeZone);
@@ -245,6 +248,8 @@ export class HospitalService {
         include: appointmentInclude,
       });
     });
+    await this.notifications.create({ userId: appointment.patient.id, title: "Appointment booked", message: `Your appointment with Dr. ${appointment.doctor.user.name} is booked for serial #${appointment.serialNumber}.`, type: NotificationType.APPOINTMENT_REMINDER, eventKey: `appointment:${appointment.id}` }).catch(() => undefined);
+    return appointment;
   }
   private bookableDate(date: string, timeZone: string, window: number, endTime?: string) {
     const today = hospitalToday(timeZone);
@@ -266,7 +271,7 @@ export class HospitalService {
     return pageResult(items, total, query);
   }
   async cancel(id: string, user: PublicUser) {
-    return this.db.$transaction(async (tx) => {
+    const appointment = await this.db.$transaction(async (tx) => {
       const a = await tx.appointment.findUnique({ where: { id } });
       if (!a) throw new NotFoundException("Appointment not found");
       if (user.role === Role.PATIENT && a.patientId !== user.id)
@@ -287,6 +292,7 @@ export class HospitalService {
         include: appointmentInclude,
       });
     });
+    return appointment;
   }
   async queue(id: string, date: string, user: PublicUser) {
     await this.doctor(id);
@@ -324,7 +330,7 @@ export class HospitalService {
       throw new BadRequestException(
         "Queue changes are only available for today",
       );
-    return this.db.$transaction(async (tx) => {
+    const appointment = await this.db.$transaction(async (tx) => {
       await this.lock(tx, id);
       const where = { doctorId: id, date: new Date(date) };
       if (
@@ -346,6 +352,8 @@ export class HospitalService {
         include: appointmentInclude,
       });
     });
+    await this.notifications.create({ userId: appointment.patient.id, title: "Your turn is approaching", message: `Your serial #${appointment.serialNumber} is now being called.`, type: NotificationType.QUEUE_UPDATE, eventKey: `queue:${appointment.id}:called` }).catch(() => undefined);
+    return appointment;
   }
   async complete(id: string, user: PublicUser) {
     const a = await this.db.appointment.findUnique({ where: { id } });
@@ -407,6 +415,7 @@ export class HospitalService {
       update: data,
     });
     await this.prescriptions.generate(record.id);
+    await this.notifications.create({ userId: a.patientId, title: "Prescription ready", message: "Your prescription is ready to view in your medical records.", type: NotificationType.PRESCRIPTION_READY, eventKey: `prescription:${record.id}` }).catch(() => undefined);
     return record;
   }
   async history(patientId: string, user: PublicUser, query: PageQuery) {

@@ -23,4 +23,10 @@ export class S3StorageProvider implements StorageProvider {
   async getSignedUrl(key: string): Promise<string> {
     return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: this.signedUrlTtlSeconds });
   }
+
+  async read(key: string): Promise<Buffer> {
+    const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!result.Body) throw new Error("Stored file is unavailable");
+    return Buffer.from(await result.Body.transformToByteArray());
+  }
 }

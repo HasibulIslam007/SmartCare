@@ -33,4 +33,8 @@ export class StorageService {
   generateDownloadUrl(key: string): Promise<string> {
     return this.provider.getSignedUrl(key);
   }
+
+  readFile(key: string): Promise<Buffer> {
+    return this.provider.read(key);
+  }
 }

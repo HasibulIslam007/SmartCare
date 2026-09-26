@@ -106,6 +106,10 @@ describe("hospital workflow", () => {
   });
   afterAll(async () => {
     if (db) {
+      // Prescription files reference medical records with RESTRICT, so they go first.
+      await db.prescriptionFile.deleteMany({
+        where: { medicalRecord: { appointment: { doctorId } } },
+      });
       await db.medicalRecord.deleteMany({
         where: { appointment: { doctorId } },
       });
@@ -113,6 +117,13 @@ describe("hospital workflow", () => {
       await db.schedule.deleteMany({ where: { doctorId } });
       await db.doctor.deleteMany({ where: { id: doctorId } });
       await db.department.deleteMany({ where: { id: departmentId } });
+      // Notifications and preferences reference users with RESTRICT.
+      await db.notification.deleteMany({
+        where: { user: { email: { endsWith: suffix } } },
+      });
+      await db.notificationPreference.deleteMany({
+        where: { user: { email: { endsWith: suffix } } },
+      });
       await db.user.deleteMany({ where: { email: { endsWith: suffix } } });
     }
     await app?.close();
@@ -121,9 +132,9 @@ describe("hospital workflow", () => {
     const res = await request(app.getHttpServer())
       .get("/api/v1/doctors")
       .expect(200);
-    expect(res.body.data.some((d: { id: string }) => d.id === doctorId)).toBe(
-      true,
-    );
+    expect(
+      res.body.data.items.some((d: { id: string }) => d.id === doctorId),
+    ).toBe(true);
     expect(JSON.stringify(res.body)).not.toContain("passwordHash");
     expect(JSON.stringify(res.body)).not.toContain(actors.doctor.token);
   });
@@ -200,7 +211,7 @@ describe("hospital workflow", () => {
       .set("Authorization", auth("other"))
       .expect(200);
     expect(
-      other.body.data.some((a: { id: string }) => a.id === appointmentId),
+      other.body.data.items.some((a: { id: string }) => a.id === appointmentId),
     ).toBe(false);
     await request(app.getHttpServer())
       .patch(`/api/v1/appointments/${appointmentId}/cancel`)
@@ -253,8 +264,8 @@ describe("hospital workflow", () => {
       .set("Authorization", auth("patient"))
       .expect(200);
     expect(
-      own.body.data.find((a: { id: string }) => a.id === appointmentId).record
-        .diagnosis,
+      own.body.data.items.find((a: { id: string }) => a.id === appointmentId)
+        .record.diagnosis,
     ).toBe(record.diagnosis);
     const reception = await request(app.getHttpServer())
       .get("/api/v1/appointments")

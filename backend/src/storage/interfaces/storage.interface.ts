@@ -2,6 +2,7 @@ export interface StorageProvider {
   upload(file: Buffer, key: string, mimeType: string): Promise<string>;
   delete(key: string): Promise<void>;
   getSignedUrl(key: string): Promise<string>;
+  read(key: string): Promise<Buffer>;
 }
 
 export interface VirusScanner {

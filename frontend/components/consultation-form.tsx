@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
-import { api, Appointment, MedicalRecord, Medicine, dateLabel } from "@/services/api";
+import { apiItems, Appointment, MedicalRecord, Medicine, dateLabel } from "@/services/api";
 import { ErrorMessage, Submit } from "./shared";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -11,7 +11,7 @@ import { Textarea } from "./ui/textarea";
 
 export function ConsultationForm({ appointment, save, pending, error }: { appointment: Appointment; save: (data: unknown) => void; pending: boolean; error: unknown }) {
   const [medicines, setMedicines] = useState<Medicine[]>(appointment.record?.medicines ?? []);
-  const history = useQuery({ queryKey: ['history', appointment.patient.id], queryFn: () => api<MedicalRecord[]>(`patients/${appointment.patient.id}/history`) });
+  const history = useQuery({ queryKey: ['history', appointment.patient.id], queryFn: () => apiItems<MedicalRecord>(`patients/${appointment.patient.id}/history`) });
   function change(index: number, field: keyof Medicine, value: string) { setMedicines(current => current.map((m, i) => i === index ? { ...m, [field]: value } : m)); }
   return <>
     <details className="patient-history"><summary>Previous consultation records ({history.data?.length ?? 0})</summary><ErrorMessage error={history.error}/>{history.data?.map(r => <div key={r.id}><strong>{dateLabel(r.createdAt)} · {r.diagnosis}</strong><p>{r.notes}</p></div>)}{history.data?.length === 0 && <p>No previous records.</p>}</details>

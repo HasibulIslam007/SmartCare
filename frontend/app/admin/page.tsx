@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, send, User, Department } from "@/services/api";
+import { api, apiItems, send, User, Department } from "@/services/api";
 import { Access } from "@/components/access";
 import { ErrorMessage, PageHeading, Submit } from "@/components/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +13,11 @@ function Content() {
   const { data: me } = useSession();
   const users = useQuery({
     queryKey: ["admin-users"],
-    queryFn: () => api<User[]>("admin/users"),
+    queryFn: () => apiItems<User>("admin/users"),
   });
   const departments = useQuery({
     queryKey: ["departments"],
-    queryFn: () => api<Department[]>("departments"),
+    queryFn: () => apiItems<Department>("departments"),
   });
   const stats = useQuery({
     queryKey: ["analytics"],

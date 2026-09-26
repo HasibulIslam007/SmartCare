@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   api,
+  apiItems,
   send,
   Appointment,
   Doctor,
@@ -41,16 +42,16 @@ function Content() {
   const [selected, setSelected] = useState<Appointment | null>(null);
   const doctors = useQuery({
     queryKey: ["doctors"],
-    queryFn: () => api<Doctor[]>("doctors"),
+    queryFn: () => apiItems<Doctor>("doctors"),
   });
   const q = useQuery({
     queryKey: ["appointments"],
-    queryFn: () => api<Appointment[]>("appointments"),
+    queryFn: () => apiItems<Appointment>("appointments"),
     refetchInterval: 10000,
   });
   const patients = useQuery({
     queryKey: ["patients"],
-    queryFn: () => api<User[]>("patients"),
+    queryFn: () => apiItems<User>("patients"),
     enabled: user?.role !== "DOCTOR",
   });
   const available = doctors.data?.filter(

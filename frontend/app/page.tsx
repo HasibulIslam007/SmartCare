@@ -13,7 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
-import { api, Appointment, Doctor, dateLabel } from "@/services/api";
+import { apiItems, Appointment, Doctor, dateLabel } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DoctorCard } from "@/components/doctor-card";
@@ -22,11 +22,11 @@ export default function Overview() {
   const { data: user } = useSession();
   const doctors = useQuery({
     queryKey: ["doctors"],
-    queryFn: () => api<Doctor[]>("doctors"),
+    queryFn: () => apiItems<Doctor>("doctors"),
   });
   const appointments = useQuery({
     queryKey: ["appointments"],
-    queryFn: () => api<Appointment[]>("appointments"),
+    queryFn: () => apiItems<Appointment>("appointments"),
     enabled: !!user,
   });
   const next = appointments.data

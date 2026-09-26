@@ -1,6 +1,7 @@
 import { HospitalModule } from "./hospital/hospital.module";
 import { StorageModule } from "./storage/storage.module";
 import { ReportsModule } from "./reports/reports.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
@@ -19,6 +20,7 @@ import { HealthModule } from "./health/health.module";
     HospitalModule,
     StorageModule,
     ReportsModule,
+    NotificationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

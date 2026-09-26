@@ -13,6 +13,7 @@ export const publicUserSelect = {
   email: true,
   phone: true,
   role: true,
+  emailVerifiedAt: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -54,6 +55,24 @@ export class UsersService {
       }
       throw error;
     }
+  }
+  /** Full record including MFA state; for authentication internals only. */
+  findAuthById(id: string) {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+  async updatePassword(id: string, passwordHash: string) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+      select: { id: true },
+    });
+  }
+  async markEmailVerified(id: string) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { emailVerifiedAt: new Date() },
+      select: publicUserSelect,
+    });
   }
   async changeRole(id: string, role: Role) {
     try {

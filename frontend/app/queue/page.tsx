@@ -3,7 +3,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MapPin, RefreshCw } from "lucide-react";
-import { api, Appointment, Doctor, Queue, today } from "@/services/api";
+import { api, apiItems, Appointment, Doctor, Queue, today } from "@/services/api";
 import { Access } from "@/components/access";
 import { Empty, ErrorMessage, Loading, PageHeading } from "@/components/shared";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,11 +22,11 @@ function QueueContent() {
   const [date, setDate] = useState(params.get("date") ?? today());
   const doctors = useQuery({
     queryKey: ["doctors"],
-    queryFn: () => api<Doctor[]>("doctors"),
+    queryFn: () => apiItems<Doctor>("doctors"),
   });
   const appointments = useQuery({
     queryKey: ["appointments"],
-    queryFn: () => api<Appointment[]>("appointments"),
+    queryFn: () => apiItems<Appointment>("appointments"),
   });
   const id =
     chosen ||
