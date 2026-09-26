@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output = "../backend/src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../backend/src/generated/prisma"
   moduleFormat = "cjs"
 }
 
@@ -15,73 +15,126 @@ enum Role {
   ADMIN
 }
 
-model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String   @db.VarChar(100)
-  phone        String   @unique @db.VarChar(16)
-  email        String   @unique @db.VarChar(254)
-  passwordHash String   @map("password_hash")
-  role         Role     @default(PATIENT)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+enum NotificationType {
+  APPOINTMENT_REMINDER
+  QUEUE_UPDATE
+  REPORT_READY
+  PRESCRIPTION_READY
+  SYSTEM
+}
 
-  doctor Doctor?
-  appointments Appointment[]
-  profile PatientProfile?
-  medicalReportsAsPatient MedicalReport[] @relation("MedicalReportPatient")
-  medicalReportsUploaded MedicalReport[] @relation("MedicalReportUploader")
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String    @db.VarChar(100)
+  phone           String    @unique @db.VarChar(16)
+  email           String    @unique @db.VarChar(254)
+  passwordHash    String    @map("password_hash")
+  role            Role      @default(PATIENT)
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  // TOTP secret, AES-256-GCM encrypted at rest; null until staff enrol.
+  mfaSecret       String?   @map("mfa_secret") @db.VarChar(255)
+  mfaEnabledAt    DateTime? @map("mfa_enabled_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  doctor                  Doctor?
+  appointments            Appointment[]
+  profile                 PatientProfile?
+  medicalReportsAsPatient MedicalReport[]         @relation("MedicalReportPatient")
+  medicalReportsUploaded  MedicalReport[]         @relation("MedicalReportUploader")
+  reportSharesCreated     ReportShare[]           @relation("ReportShareCreator")
+  reportAuditEvents       ReportAudit[]           @relation("ReportAuditActor")
+  notifications           Notification[]
+  notificationPreference  NotificationPreference?
+  authTokens              AuthToken[]
+  mfaRecoveryCodes        MfaRecoveryCode[]
 
   @@map("users")
 }
 
+enum AuthTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model AuthToken {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   AuthTokenPurpose
+  tokenHash String           @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime         @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime?        @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId, purpose])
+  @@map("auth_tokens")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @unique @map("code_hash") @db.VarChar(64)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
 model PatientProfile {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @unique @map("user_id") @db.Uuid
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dateOfBirth DateTime? @db.Date
-  gender String? @db.VarChar(30)
-  bloodGroup String? @db.VarChar(5)
-  address String? @db.VarChar(500)
-  emergencyContact String? @db.VarChar(100)
-  allergies String? @db.VarChar(1000)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @unique @map("user_id") @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth      DateTime? @db.Date
+  gender           String?   @db.VarChar(30)
+  bloodGroup       String?   @db.VarChar(5)
+  address          String?   @db.VarChar(500)
+  emergencyContact String?   @db.VarChar(100)
+  allergies        String?   @db.VarChar(1000)
+
   @@map("patient_profiles")
 }
 
 model Department {
-  id String @id @default(uuid()) @db.Uuid
-  name String @unique @db.VarChar(100)
-  description String @db.VarChar(500)
-  location String @db.VarChar(100)
-  doctors Doctor[]
-  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique @db.VarChar(100)
+  description String    @db.VarChar(500)
+  location    String    @db.VarChar(100)
+  doctors     Doctor[]
+  archivedAt  DateTime? @map("archived_at") @db.Timestamptz(3)
+
   @@map("departments")
 }
 
 model Doctor {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @unique @map("user_id") @db.Uuid
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  departmentId String @map("department_id") @db.Uuid
-  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  qualification String @db.VarChar(200)
-  specialization String @db.VarChar(100)
-  experience Int
-  consultationFee Int @map("consultation_fee")
-  roomNumber String @map("room_number") @db.VarChar(30)
-  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
-  schedules Schedule[]
-  appointments Appointment[]
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @unique @map("user_id") @db.Uuid
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  departmentId    String        @map("department_id") @db.Uuid
+  department      Department    @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  qualification   String        @db.VarChar(200)
+  specialization  String        @db.VarChar(100)
+  experience      Int
+  consultationFee Int           @map("consultation_fee")
+  roomNumber      String        @map("room_number") @db.VarChar(30)
+  archivedAt      DateTime?     @map("archived_at") @db.Timestamptz(3)
+  schedules       Schedule[]
+  appointments    Appointment[]
+
   @@map("doctors")
 }
 
 model Schedule {
-  id String @id @default(uuid()) @db.Uuid
-  doctorId String @map("doctor_id") @db.Uuid
-  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  day Int
-  startTime String @map("start_time") @db.VarChar(5)
-  endTime String @map("end_time") @db.VarChar(5)
-  maximumPatients Int @map("maximum_patients")
+  id              String @id @default(uuid()) @db.Uuid
+  doctorId        String @map("doctor_id") @db.Uuid
+  doctor          Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  day             Int
+  startTime       String @map("start_time") @db.VarChar(5)
+  endTime         String @map("end_time") @db.VarChar(5)
+  maximumPatients Int    @map("maximum_patients")
+
   @@unique([doctorId, day])
   @@map("schedules")
 }
@@ -94,17 +147,18 @@ enum AppointmentStatus {
 }
 
 model Appointment {
-  id String @id @default(uuid()) @db.Uuid
-  patientId String @map("patient_id") @db.Uuid
-  patient User @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  doctorId String @map("doctor_id") @db.Uuid
-  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-  date DateTime @db.Date
-  serialNumber Int @map("serial_number")
-  status AppointmentStatus @default(WAITING)
-  reason String @db.VarChar(500)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  record MedicalRecord?
+  id           String            @id @default(uuid()) @db.Uuid
+  patientId    String            @map("patient_id") @db.Uuid
+  patient      User              @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctorId     String            @map("doctor_id") @db.Uuid
+  doctor       Doctor            @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  date         DateTime          @db.Date
+  serialNumber Int               @map("serial_number")
+  status       AppointmentStatus @default(WAITING)
+  reason       String            @db.VarChar(500)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  record       MedicalRecord?
+
   @@unique([doctorId, date, serialNumber])
   @@index([patientId, date])
   @@index([doctorId, date, status])
@@ -112,29 +166,30 @@ model Appointment {
 }
 
 model MedicalRecord {
-  id String @id @default(uuid()) @db.Uuid
-  appointmentId String @unique @map("appointment_id") @db.Uuid
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
-  notes String @db.VarChar(5000)
-  diagnosis String @db.VarChar(1000)
-  advice String @db.VarChar(2000)
-  followUp DateTime? @db.Date
-  medicines Json
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  id               String            @id @default(uuid()) @db.Uuid
+  appointmentId    String            @unique @map("appointment_id") @db.Uuid
+  appointment      Appointment       @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  notes            String            @db.VarChar(5000)
+  diagnosis        String            @db.VarChar(1000)
+  advice           String            @db.VarChar(2000)
+  followUp         DateTime?         @db.Date
+  medicines        Json
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
   prescriptionFile PrescriptionFile?
+
   @@map("medical_records")
 }
 
 model PrescriptionFile {
-  id             String       @id @default(uuid()) @db.Uuid
-  medicalRecordId String      @unique @map("medical_record_id") @db.Uuid
-  medicalRecord  MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Restrict)
-  fileKey        String       @map("file_key") @db.VarChar(500)
-  fileName       String       @map("file_name") @db.VarChar(255)
-  mimeType       String       @map("mime_type") @db.VarChar(100)
-  fileSize       Int          @map("file_size")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id              String        @id @default(uuid()) @db.Uuid
+  medicalRecordId String        @unique @map("medical_record_id") @db.Uuid
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Restrict)
+  fileKey         String        @map("file_key") @db.VarChar(500)
+  fileName        String        @map("file_name") @db.VarChar(255)
+  mimeType        String        @map("mime_type") @db.VarChar(100)
+  fileSize        Int           @map("file_size")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("prescription_files")
 }
@@ -155,36 +210,113 @@ enum ReportStatus {
   ARCHIVED
 }
 
+enum ReportAuditAction {
+  REPORT_UPLOADED
+  REPORT_VIEWED
+  REPORT_DOWNLOADED
+  REPORT_ARCHIVED
+  REPORT_RESTORED
+  SHARE_CREATED
+  SHARE_ACCESSED
+  SHARE_REVOKED
+}
+
 model MedicalReport {
-  id           String       @id @default(uuid()) @db.Uuid
-  patientId    String       @map("patient_id") @db.Uuid
-  uploadedById String       @map("uploaded_by_id") @db.Uuid
-  patient      User         @relation("MedicalReportPatient", fields: [patientId], references: [id], onDelete: Restrict)
-  uploadedBy   User         @relation("MedicalReportUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
-  title        String       @db.VarChar(200)
-  reportType   ReportType   @map("report_type")
-  fileKey      String       @map("file_key") @db.VarChar(500)
-  fileName     String       @map("file_name") @db.VarChar(255)
-  mimeType     String       @map("mime_type") @db.VarChar(100)
-  fileSize     Int          @map("file_size")
-  description  String?      @db.VarChar(2000)
-  status       ReportStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String        @id @default(uuid()) @db.Uuid
+  patientId    String        @map("patient_id") @db.Uuid
+  uploadedById String        @map("uploaded_by_id") @db.Uuid
+  patient      User          @relation("MedicalReportPatient", fields: [patientId], references: [id], onDelete: Restrict)
+  uploadedBy   User          @relation("MedicalReportUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  title        String        @db.VarChar(200)
+  reportType   ReportType    @map("report_type")
+  fileKey      String        @map("file_key") @db.VarChar(500)
+  fileName     String        @map("file_name") @db.VarChar(255)
+  mimeType     String        @map("mime_type") @db.VarChar(100)
+  fileSize     Int           @map("file_size")
+  description  String?       @db.VarChar(2000)
+  status       ReportStatus  @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  shares       ReportShare[]
+  auditEvents  ReportAudit[]
 
   @@index([patientId, status, createdAt])
   @@index([uploadedById, createdAt])
   @@map("medical_reports")
 }
 
+model ReportShare {
+  id            String        @id @default(uuid()) @db.Uuid
+  reportId      String        @map("report_id") @db.Uuid
+  report        MedicalReport @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  createdById   String        @map("created_by_id") @db.Uuid
+  createdBy     User          @relation("ReportShareCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  tokenHash     String        @unique @map("token_hash") @db.VarChar(64)
+  passcodeHash  String?       @map("passcode_hash") @db.VarChar(255)
+  expiresAt     DateTime      @map("expires_at") @db.Timestamptz(3)
+  maxDownloads  Int?          @map("max_downloads")
+  downloadCount Int           @default(0) @map("download_count")
+  revokedAt     DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([reportId, createdAt])
+  @@map("report_shares")
+}
+
+model ReportAudit {
+  id         String            @id @default(uuid()) @db.Uuid
+  reportId   String            @map("report_id") @db.Uuid
+  report     MedicalReport     @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  actorId    String?           @map("actor_id") @db.Uuid
+  actor      User?             @relation("ReportAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  actorRole  Role?             @map("actor_role")
+  action     ReportAuditAction
+  occurredAt DateTime          @default(now()) @map("occurred_at") @db.Timestamptz(3)
+
+  @@index([reportId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("report_audits")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  title     String           @db.VarChar(200)
+  message   String           @db.VarChar(1000)
+  type      NotificationType
+  eventKey  String           @unique @map("event_key") @db.VarChar(255)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @map("user_id") @db.Uuid
+  user              User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  appointmentAlert  Boolean  @default(true) @map("appointment_alert")
+  queueAlert        Boolean  @default(true) @map("queue_alert")
+  reportAlert       Boolean  @default(true) @map("report_alert")
+  prescriptionAlert Boolean  @default(true) @map("prescription_alert")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("notification_preferences")
+}
+
 model HospitalSettings {
-  id String @id @default("main")
-  name String @default("SmartCare Hospital") @db.VarChar(100)
-  address String @default("") @db.VarChar(500)
-  phone String @default("") @db.VarChar(16)
-  email String @default("") @db.VarChar(254)
-  timeZone String @default("Asia/Dhaka") @map("time_zone") @db.VarChar(100)
-  bookingWindowDays Int @default(90) @map("booking_window_days")
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                String   @id @default("main")
+  name              String   @default("SmartCare Hospital") @db.VarChar(100)
+  address           String   @default("") @db.VarChar(500)
+  phone             String   @default("") @db.VarChar(16)
+  email             String   @default("") @db.VarChar(254)
+  timeZone          String   @default("Asia/Dhaka") @map("time_zone") @db.VarChar(100)
+  bookingWindowDays Int      @default(90) @map("booking_window_days")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
   @@map("hospital_settings")
 }

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { api, Department, Doctor } from "@/services/api";
+import { apiItems, Department, Doctor } from "@/services/api";
 import { DoctorCard } from "@/components/doctor-card";
 import { Empty, ErrorMessage, Loading, PageHeading } from "@/components/shared";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,11 @@ export default function Doctors() {
   const [department, setDepartment] = useState("");
   const departments = useQuery({
     queryKey: ["departments"],
-    queryFn: () => api<Department[]>("departments"),
+    queryFn: () => apiItems<Department>("departments"),
   });
   const doctors = useQuery({
     queryKey: ["doctors"],
-    queryFn: () => api<Doctor[]>("doctors"),
+    queryFn: () => apiItems<Doctor>("doctors"),
   });
   const filtered = doctors.data?.filter(
     (d) =>

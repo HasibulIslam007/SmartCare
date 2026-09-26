@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 const allowed =
-  /^(auth\/(login|register|logout)|users\/me|users\/[\w-]+\/role|departments|doctors(?:\/[\w-]+(?:\/(availability|schedules))?)?|appointments(?:\/[\w-]+\/(cancel|complete|record))?|queue\/[\w-]+(?:\/next)?|patients(?:\/me|\/[\w-]+\/history)?|reports(?:\/[\w-]+\/download)?|prescriptions\/[\w-]+\/download|admin\/(users|analytics)|health)$/;
+  /^(auth\/(login|register|logout|forgot-password|reset-password|verify-email(?:\/resend)?|mfa(?:\/(enroll|activate|disable|challenge))?)|users\/me|users\/[\w-]+\/role|settings|departments(?:\/[\w-]+(?:\/archive)?)?|doctors(?:\/[\w-]+(?:\/(availability|schedules|archive))?)?|appointments(?:\/[\w-]+\/(cancel|complete|record))?|queue\/[\w-]+(?:\/next)?|patients(?:\/me|\/[\w-]+\/history)?|reports(?:\/shared\/[\w-]+|\/[\w-]+(?:\/(download|content|status|shares(?:\/[\w-]+\/revoke)?))?)?|prescriptions\/[\w-]+\/download|notifications(?:\/(unread-count|read-all|[\w-]+\/read|preferences))?|admin\/(users|analytics|settings|departments|doctors)|health)$/;
 async function proxy(
   req: NextRequest,
   context: { params: Promise<{ path: string[] }> },
@@ -31,8 +31,9 @@ async function proxy(
   }
   const token = jar.get("smartcare_session")?.value;
   try {
-    const body = req.method === "GET" ? undefined : await req.text();
-    if (body && body.length > 65536)
+    const contentType = req.headers.get("content-type") ?? "application/json";
+    const body = req.method === "GET" ? undefined : await req.arrayBuffer();
+    if (body && body.byteLength > 11 * 1024 * 1024)
       return NextResponse.json(
         { success: false, message: "Request too large", data: null },
         { status: 413 },
@@ -42,7 +43,7 @@ async function proxy(
       {
         method: req.method,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": contentType,
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body,
@@ -50,10 +51,29 @@ async function proxy(
         signal: AbortSignal.timeout(15000),
       },
     );
+    const responseType = response.headers.get("content-type") ?? "";
+    if (!responseType.includes("application/json")) {
+      const file = await response.arrayBuffer();
+      return new NextResponse(file, {
+        status: response.status,
+        headers: {
+          "Content-Type": responseType || "application/octet-stream",
+          ...(response.headers.get("content-disposition") ? { "Content-Disposition": response.headers.get("content-disposition")! } : {}),
+          "Cache-Control": "no-store",
+        },
+      });
+    }
     const data = await response.json();
+    const issuesSession =
+      endpoint === "auth/login" ||
+      endpoint === "auth/register" ||
+      endpoint === "auth/mfa/challenge";
+    // A password sign-in that needs a second factor returns no token, so the
+    // cookie is only written when one was actually issued.
     if (
       response.ok &&
-      (endpoint === "auth/login" || endpoint === "auth/register")
+      issuesSession &&
+      typeof data.data?.accessToken === "string"
     ) {
       jar.set("smartcare_session", data.data.accessToken, {
         httpOnly: true,

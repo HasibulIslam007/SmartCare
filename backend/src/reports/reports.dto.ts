@@ -1,4 +1,5 @@
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
 import { ReportStatus, ReportType } from "../generated/prisma/enums";
 
 export class CreateReportDto {
@@ -19,7 +20,43 @@ export class CreateReportDto {
   description?: string;
 }
 
+export class ReportStatusDto {
+  @IsEnum(ReportStatus)
+  status!: ReportStatus;
+}
+
+export class CreateReportShareDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  expiresInDays: number = 7;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  maxDownloads?: number;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4,12}$/, { message: "passcode must contain 4 to 12 digits" })
+  passcode?: string;
+}
+
+export class SharedReportQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(12)
+  passcode?: string;
+}
+
 export class ListReportsQueryDto {
+  @IsOptional()
+  @IsUUID()
+  patientId?: string;
+
   @IsOptional()
   @IsEnum(ReportType)
   type?: ReportType;

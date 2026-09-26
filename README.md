@@ -71,6 +71,8 @@ For a real first administrator: register the intended user, then run `ADMIN_EMAI
 cd backend
 npm run build
 npm test
+# Once only: create the isolated test database, then migrate it.
+createdb -h 127.0.0.1 -p 55432 -U smartcare smartcare_test
 DATABASE_URL=postgresql://smartcare@127.0.0.1:55432/smartcare_test npm run db:migrate
 TEST_DATABASE_URL=postgresql://smartcare@127.0.0.1:55432/smartcare_test npm run test:api
 cd ../frontend
@@ -78,10 +80,11 @@ npm run build
 npm run typecheck
 ```
 
-API tests require an isolated test database and clean up their own fixtures. They exercise real PostgreSQL, including simultaneous bookings and access control.
+API tests require an isolated test database and clean up their own fixtures. They exercise real PostgreSQL, including simultaneous bookings and access control. `TEST_DATABASE_URL` must be provided inline as shown; the suite refuses to run without it rather than risk pointing at the development database.
 
 ## Documentation
 
+- [Product overview and roadmap](documentation/product-overview-and-roadmap.md)
 - [Requirements and remaining milestones](documentation/requirements.md)
 - [Architecture](documentation/architecture.md)
 - [Database design](documentation/database.md)

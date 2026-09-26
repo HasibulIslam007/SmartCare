@@ -16,6 +16,7 @@ import {
   Stethoscope,
   UserRound,
   X,
+  Bell,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -32,13 +33,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const client = useQueryClient();
   const [error, setError] = useState<unknown>();
-  if (pathname === "/login" || pathname === "/register") return <>{children}</>;
+  // Account and recovery screens render without the signed-in shell.
+  if (
+    ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"].includes(
+      pathname,
+    )
+  )
+    return <>{children}</>;
   const staff = user && user.role !== "PATIENT";
   const links = [
     { href: "/", label: "Overview", icon: LayoutDashboard },
     { href: "/doctors", label: "Find a doctor", icon: Stethoscope },
     { href: "/appointments", label: "Appointments", icon: CalendarDays },
     { href: "/queue", label: "Live queue", icon: Activity },
+    ...(!staff ? [{ href: "/notifications", label: "Notifications", icon: Bell }] : []),
     ...(!staff
       ? [
           { href: "/records", label: "Medical records", icon: ClipboardList },
@@ -47,7 +55,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         ]
       : []),
     ...(staff
-      ? [{ href: "/workspace", label: "Care workspace", icon: HeartPulse }]
+      ? [
+          { href: "/workspace", label: "Care workspace", icon: HeartPulse },
+          { href: "/security", label: "Account security", icon: ShieldCheck },
+        ]
       : []),
     ...(user?.role === "ADMIN"
       ? [{ href: "/admin", label: "Administration", icon: Settings2 }]

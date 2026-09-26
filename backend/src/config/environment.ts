@@ -27,6 +27,12 @@ export function validateEnvironment(env: Record<string, unknown>) {
       throw new Error("S3_ACCESS_KEY and S3_SECRET_KEY must be provided together");
     }
   }
+  const mfaEncryptionKey = String(env.MFA_ENCRYPTION_KEY ?? "").trim();
+  if (mfaEncryptionKey && mfaEncryptionKey.length < 32) {
+    throw new Error(
+      "MFA_ENCRYPTION_KEY must be at least 32 characters when provided",
+    );
+  }
   const maxUploadSize = Number(env.MAX_UPLOAD_SIZE ?? 10 * 1024 * 1024);
   if (!Number.isSafeInteger(maxUploadSize) || maxUploadSize < 1 || maxUploadSize > 10 * 1024 * 1024) {
     throw new Error("MAX_UPLOAD_SIZE must be a positive integer no greater than 10 MB");

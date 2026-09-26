@@ -3,7 +3,7 @@ import { AppointmentStatus, Role } from "../generated/prisma/enums";
 import { PrescriptionService } from "./prescription.service";
 import { createPrescriptionPdf } from "./prescription-pdf";
 
-const user = (role: Role, id = "11111111-1111-4111-8111-111111111111") => ({ id, name: "Test", email: "test@example.test", phone: "+8801000000000", role, createdAt: new Date(), updatedAt: new Date() });
+const user = (role: Role, id = "11111111-1111-4111-8111-111111111111") => ({ id, name: "Test", email: "test@example.test", phone: "+8801000000000", role, emailVerifiedAt: null, createdAt: new Date(), updatedAt: new Date() });
 
 describe("PrescriptionService", () => {
   it("creates a PDF with hospital branding and prescription content", () => {

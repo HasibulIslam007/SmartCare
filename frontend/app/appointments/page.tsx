@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Plus } from "lucide-react";
-import { api, send, Appointment, dateLabel } from "@/services/api";
+import { apiItems, send, Appointment, dateLabel } from "@/services/api";
 import { useSession } from "@/hooks/use-session";
 import { Access } from "@/components/access";
 import {
@@ -33,7 +33,7 @@ function AppointmentsContent() {
   const [cancelId, setCancelId] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["appointments"],
-    queryFn: () => api<Appointment[]>("appointments"),
+    queryFn: () => apiItems<Appointment>("appointments"),
     refetchInterval: 15000,
   });
   const cancel = useMutation({

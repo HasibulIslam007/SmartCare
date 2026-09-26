@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Printer } from "lucide-react";
-import { api, Appointment, dateLabel } from "@/services/api";
+import { api, apiItems, Appointment, dateLabel } from "@/services/api";
 import { Access } from "@/components/access";
 import { Empty, ErrorMessage, Loading, PageHeading } from "@/components/shared";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +13,7 @@ function Content() {
   };
   const q = useQuery({
     queryKey: ["appointments"],
-    queryFn: () => api<Appointment[]>("appointments"),
+    queryFn: () => apiItems<Appointment>("appointments?view=records"),
   });
   const records = q.data?.filter((a) => a.record);
   return (

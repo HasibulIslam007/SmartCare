@@ -18,3 +18,5 @@ CREATE TABLE "hospital_settings" (
     CONSTRAINT "hospital_settings_pkey" PRIMARY KEY ("id")
 );
 
+INSERT INTO "hospital_settings" ("id", "updated_at")
+VALUES ('main', CURRENT_TIMESTAMP);

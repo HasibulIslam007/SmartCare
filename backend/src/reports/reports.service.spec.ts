@@ -8,6 +8,7 @@ const user = (role: Role, id = "11111111-1111-4111-8111-111111111111") => ({
   email: "test@example.test",
   phone: "+8801000000000",
   role,
+  emailVerifiedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 });

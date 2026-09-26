@@ -29,4 +29,8 @@ export class LocalStorageProvider implements StorageProvider {
     await readFile(this.pathFor(key));
     return `local-storage://${encodeURIComponent(key)}`;
   }
+
+  read(key: string): Promise<Buffer> {
+    return readFile(this.pathFor(key));
+  }
 }

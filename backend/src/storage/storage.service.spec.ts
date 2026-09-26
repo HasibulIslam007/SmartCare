@@ -10,7 +10,7 @@ describe("StorageService", () => {
   let service: StorageService;
 
   beforeEach(() => {
-    provider = { upload: jest.fn(async (_file, key, _mimeType) => key), delete: jest.fn(), getSignedUrl: jest.fn() };
+    provider = { upload: jest.fn(async (_file, key, _mimeType) => key), delete: jest.fn(), getSignedUrl: jest.fn(), read: jest.fn() };
     scanner = { scan: jest.fn().mockResolvedValue({ clean: true }) };
     service = new StorageService(provider, scanner);
   });
@@ -28,6 +28,13 @@ describe("StorageService", () => {
     await expect(service.generateDownloadUrl("safe-key")).resolves.toBe("signed-url");
     expect(provider.delete).toHaveBeenCalledWith("safe-key");
     expect(provider.getSignedUrl).toHaveBeenCalledWith("safe-key");
+  });
+
+  it("reads file bytes through the provider", async () => {
+    const bytes = pdf();
+    provider.read.mockResolvedValue(bytes);
+    await expect(service.readFile("safe-key")).resolves.toEqual(bytes);
+    expect(provider.read).toHaveBeenCalledWith("safe-key");
   });
 
   it.each([
