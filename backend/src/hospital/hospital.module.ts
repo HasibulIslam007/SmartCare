@@ -4,5 +4,7 @@ import { HospitalService } from "./hospital.service";
 import { UsersModule } from '../users/users.module';
 import { PasswordService } from '../auth/password.service';
 import { SettingsService } from './settings.service';
-@Module({ imports: [UsersModule], controllers: [HospitalController], providers: [HospitalService, SettingsService, PasswordService] })
+import { PrescriptionService } from './prescription.service';
+import { StorageModule } from '../storage/storage.module';
+@Module({ imports: [UsersModule, StorageModule], controllers: [HospitalController], providers: [HospitalService, SettingsService, PasswordService, PrescriptionService] })
 export class HospitalModule {}

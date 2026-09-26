@@ -4,7 +4,7 @@
 **Branch:** `release/v0.1`  
 **Baseline commit:** `748498c`  
 **Plan:** [`phase-3-plan.md`](./phase-3-plan.md)  
-**Status:** Phase 3.1 database model and Phase 3.2 storage foundation implemented; Phase 2 entry gates remain open
+**Status:** Phase 3.1 database model, Phase 3.2 storage foundation, Phase 3.3 report API foundation, Phase 3.4 frontend report portal, and Phase 3.5 prescription PDF access implemented; Phase 2 entry gates remain open
 
 ## Status summary
 
@@ -118,6 +118,25 @@ The proposed routes and response details are defined in `phase-3-plan.md`. None 
 - Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npm run build` and `npm test` passed after implementation. Storage tests cover upload/key generation, provider delegation, invalid files, size rejection, and scanner rejection.
 - Limitation: no report API, HTTP multipart limit, ownership authorization, audit event persistence, production scanner, retention policy, or deployment-specific bucket policy is included in this slice.
 
+### 2026-09-19 — Phase 3.3 medical report API foundation
+
+- Changed files: `backend/src/reports/`, `backend/src/app.module.ts`, and this progress file.
+- Implemented authenticated `POST /api/v1/reports` multipart upload, `GET /api/v1/reports` listing with type/status/pagination filters, and `GET /api/v1/reports/:id/download` temporary URL access.
+- Uploads enforce the existing 10 MB multipart limit and the storage validation/scanner boundary. Filenames are reduced to a basename; generated storage keys remain provider-owned. Database rows contain metadata only and report responses never include `fileKey`.
+- Authorization: patients can access only their own reports; doctors can access patients connected through `CALLED` or `COMPLETED` appointments; administrators have system access; receptionists are denied. Doctor access intentionally uses the existing appointment relationship because no separate consultation model exists.
+- Added `REPORT_UPLOADED`, `REPORT_VIEWED`, and `REPORT_DOWNLOADED` event contracts with an injectable no-op sink. Persistence is intentionally deferred until the audit schema is approved.
+- Verification: `npm run typecheck`, `npm run build`, and report service unit tests pass. Full API tests still require `TEST_DATABASE_URL` and should be run against an isolated database.
+- Limitations: production malware quarantine, retention/deletion policy, persisted audit events, and a doctor-specific consultation/assignment model remain outside this slice. Upload is restricted to administrators and doctors with an existing completed/in-progress appointment relationship; patient self-upload is not enabled.
+
+### 2026-09-19 — Phase 3.4 patient and doctor report views
+
+- Changed files: `frontend/app/api/[...path]/route.ts`, `frontend/app/reports/page.tsx`, `frontend/app/workspace/page.tsx`, `frontend/components/report-list.tsx`, `frontend/components/shell.tsx`, `frontend/services/api.ts`, `frontend/app/globals.css`, and this progress file.
+- Added the authenticated patient `/reports` page with report metadata, report-type labels, loading, empty, and error states. The patient navigation exposes the page without changing the existing records workflow.
+- Added the doctor workspace report section for the selected patient appointment. The existing backend authorization remains authoritative; the UI only displays reports returned for the selected authorized patient.
+- Downloads call `GET /api/v1/reports/:id/download` through the same-origin Next.js proxy and open only the returned short-lived signed URL. No storage key or bucket URL is generated or exposed by the frontend.
+- Verification: `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/frontend && npm run typecheck && npm run build` passed; `cd /Users/tohid/Documents/Hospital/SmartCare-HMS/backend && npm test -- --runInBand` passed with 8 suites and 29 tests; `git diff --check` passed.
+- Limitation: this repository has no configured browser-test runner or browser test suite. Full API/e2e tests still require an isolated `TEST_DATABASE_URL`; no new backend authorization behavior was introduced in this slice.
+
 Existing baseline evidence is recorded in:
 
 - `/Users/tohid/Documents/Hospital/SmartCare-HMS/documentation/phase-2-progress.md`
@@ -127,6 +146,15 @@ Existing baseline evidence is recorded in:
 For each completed Phase 3 area, add the date, branch, objective, changed files, exact commands, pass/fail output, limitations, and remaining blockers here. Do not mark a feature complete from code inspection alone.
 
 ## Current blockers and next actions
+
+### 2026-09-19 — Phase 3.5 secure prescription PDFs
+
+- Added the additive `prescription_files` metadata table and one-to-one `MedicalRecord` relation. The foreign key uses `RESTRICT`, not cascade, so healthcare records cannot be removed accidentally through file cleanup.
+- Added an in-process standards-compliant PDF generator. It uses `HospitalSettings` branding and the structured medical record; PDF bytes remain outside PostgreSQL and are uploaded through `StorageService`.
+- Doctor record writes generate or replace the private prescription object with storage rollback on metadata persistence failure. API responses expose metadata only.
+- Added `GET /api/v1/prescriptions/:id/download` for patients, treating doctors, and administrators. It performs ownership/consultation authorization and returns a five-minute signed URL only.
+- Added the patient records-page PDF download action and same-origin proxy allowlist entry. Browser-test infrastructure remains unavailable.
+- Verification: backend typecheck and existing unit tests pass; focused prescription tests added; frontend typecheck/build and migration deployment must be recorded after the final validation run.
 
 1. Commit the Phase 2 plan/progress files that are currently untracked.
 2. Complete and record the Phase 2 API, frontend, receptionist, authorization, audit, and deployment prerequisites.

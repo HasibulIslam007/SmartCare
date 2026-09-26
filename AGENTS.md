@@ -838,6 +838,22 @@ Do not start advanced features before completing the foundation.
 
 # Codex Behavior Instructions
 
+## SmartCare Database Rules
+
+- Database: PostgreSQL 16.
+- ORM: Prisma.
+- Prisma configuration: `backend/prisma.config.ts`.
+- Prisma schema: `database/schema.prisma`.
+- Prisma migrations: `database/migrations/`.
+- Run Prisma commands from `/Users/tohid/Documents/Hospital/SmartCare-HMS/backend`.
+- Do not assume `backend/prisma/schema.prisma` exists.
+- Do not create another development database unless explicitly requested. The current local SmartCare database is configured through `backend/.env` and uses `127.0.0.1:55432/smartcare`; do not change it to port `5432` without intentionally migrating the database.
+- Every schema change requires an additive Prisma migration, documentation update, and test or migration-status verification.
+- Never modify a production database directly. Production changes must go through the reviewed migration/deployment process.
+- Never permanently delete medical records. Use an approved soft-delete or archival strategy for healthcare data.
+- Store medical files outside PostgreSQL. PostgreSQL stores metadata and private storage references only.
+- Do not store PDF, image, or other medical file bytes in database columns.
+
 When working on this project:
 
 1. Understand existing architecture before modifying files.

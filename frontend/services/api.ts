@@ -71,6 +71,7 @@ export interface MedicalRecord {
   followUp: string | null;
   medicines: Medicine[];
   createdAt: string;
+  prescriptionFile?: { id: string; fileName: string; fileSize: number; createdAt: string } | null;
 }
 export interface Appointment {
   id: string;
@@ -89,6 +90,35 @@ export interface Queue {
   completed: number;
   ownSerial: number | null;
   ahead: number | null;
+}
+export type ReportType =
+  | "BLOOD_TEST"
+  | "XRAY"
+  | "MRI"
+  | "CT_SCAN"
+  | "ULTRASOUND"
+  | "PRESCRIPTION"
+  | "DISCHARGE_SUMMARY"
+  | "OTHER";
+export interface MedicalReport {
+  id: string;
+  patientId: string;
+  title: string;
+  reportType: ReportType;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  description: string | null;
+  status: "ACTIVE" | "ARCHIVED";
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ReportsPage {
+  reports: MedicalReport[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}
+export function reportTypeLabel(type: ReportType) {
+  return type.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 export function today() {
   return new Intl.DateTimeFormat("en-CA", {

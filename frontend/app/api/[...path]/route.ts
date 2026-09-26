@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 const allowed =
-  /^(auth\/(login|register|logout)|users\/me|users\/[\w-]+\/role|departments|doctors(?:\/[\w-]+(?:\/(availability|schedules))?)?|appointments(?:\/[\w-]+\/(cancel|complete|record))?|queue\/[\w-]+(?:\/next)?|patients(?:\/me|\/[\w-]+\/history)?|admin\/(users|analytics)|health)$/;
+  /^(auth\/(login|register|logout)|users\/me|users\/[\w-]+\/role|departments|doctors(?:\/[\w-]+(?:\/(availability|schedules))?)?|appointments(?:\/[\w-]+\/(cancel|complete|record))?|queue\/[\w-]+(?:\/next)?|patients(?:\/me|\/[\w-]+\/history)?|reports(?:\/[\w-]+\/download)?|prescriptions\/[\w-]+\/download|admin\/(users|analytics)|health)$/;
 async function proxy(
   req: NextRequest,
   context: { params: Promise<{ path: string[] }> },

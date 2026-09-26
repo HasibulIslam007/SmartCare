@@ -1,12 +1,16 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { Printer } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import { api, Appointment, dateLabel } from "@/services/api";
 import { Access } from "@/components/access";
 import { Empty, ErrorMessage, Loading, PageHeading } from "@/components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 function Content() {
+  const download = async (id: string) => {
+    const result = await api<{ url: string }>(`prescriptions/${id}/download`);
+    window.open(result.url, "_blank", "noopener,noreferrer");
+  };
   const q = useQuery({
     queryKey: ["appointments"],
     queryFn: () => api<Appointment[]>("appointments"),
@@ -37,6 +41,12 @@ function Content() {
                     <Printer size={16} />
                     Print records / save PDF
                   </Button>
+                  {a.record!.prescriptionFile && (
+                    <Button variant="outline" onClick={() => download(a.record!.prescriptionFile!.id)}>
+                      <Download size={16} />
+                      Download prescription PDF
+                    </Button>
+                  )}
                 </div>
                 <h3>Consultation</h3>
                 <p>{a.record!.notes}</p>

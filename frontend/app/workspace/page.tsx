@@ -20,6 +20,8 @@ import {
   Submit,
   Loading,
 } from "@/components/shared";
+import { ReportList } from "@/components/report-list";
+import { ReportsPage } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -59,6 +61,11 @@ function Content() {
   const appointments = q.data?.filter(
     (a) => a.doctor.id === id && a.date.slice(0, 10) === today(),
   );
+  const patientReports = useQuery({
+    queryKey: ["reports"],
+    queryFn: () => api<ReportsPage>("reports"),
+    enabled: user?.role === "DOCTOR" && !!selected,
+  });
   const current = appointments?.find((a) => a.status === "CALLED");
   const refresh = () =>
     client.invalidateQueries({ queryKey: ["appointments"] });
@@ -352,6 +359,23 @@ function Content() {
           {selected && <ConsultationForm key={selected.id} appointment={selected} save={data => record.mutate(data)} pending={record.isPending} error={record.error} />}
         </DialogContent>
       </Dialog>
+      {user?.role === "DOCTOR" && selected && (
+        <section className="workspace-reports">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">PATIENT DOCUMENTS</span>
+              <h2>{selected.patient.name}&apos;s reports</h2>
+            </div>
+          </div>
+          <ReportList
+            reports={patientReports.data?.reports.filter((report) => report.patientId === selected.patient.id)}
+            isPending={patientReports.isPending}
+            error={patientReports.error}
+            emptyTitle="No reports for this patient yet."
+            emptyText="Uploaded medical reports will appear here after they are added to the patient record."
+          />
+        </section>
+      )}
     </>
   );
 }

@@ -1220,6 +1220,51 @@ td select {
   flex-direction: column;
   gap: 22px;
 }
+.report-list {
+  display: grid;
+  gap: 12px;
+}
+.report-card {
+  box-shadow: none !important;
+}
+.report-card > [data-slot="card-content"] {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 18px 20px;
+}
+.report-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  color: #397d70;
+  background: #edf5ef;
+}
+.report-detail {
+  flex: 1;
+  min-width: 0;
+}
+.report-detail .eyebrow {
+  margin-bottom: 3px;
+}
+.report-detail h3 {
+  font-size: 15px;
+}
+.report-detail > p:not(.eyebrow) {
+  color: #839189;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.report-detail small {
+  display: block;
+  margin-top: 5px;
+}
+.workspace-reports {
+  margin-top: 32px;
+}
 .record-card .section-title {
   margin-top: 0;
 }
