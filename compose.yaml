@@ -14,5 +14,42 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Production-like local check: builds both Dockerfiles, runs migrations on boot.
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://smartcare:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your shell}@postgres:5432/smartcare
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your shell (openssl rand -hex 32)}
+      CORS_ORIGIN: http://127.0.0.1:3000
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      STORAGE_PROVIDER: local
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        BACKEND_URL: http://backend:3001
+        APP_ORIGIN: http://127.0.0.1:3000
+    environment:
+      BACKEND_URL: http://backend:3001
+      APP_ORIGIN: http://127.0.0.1:3000
+      PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
+

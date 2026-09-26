@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: smartcare-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartcare-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false # set to https://<your-frontend-domain>
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true
+      - key: STORAGE_PROVIDER
+        value: s3
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_EMAIL_FROM
+        sync: false
+
+databases:
+  - name: smartcare-postgres
+    databaseName: smartcare
+    user: smartcare
